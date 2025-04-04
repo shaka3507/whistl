@@ -18,25 +18,24 @@ export default function Home() {
             <div className="flex flex-col items-center justify-center space-y-4 text-center">
               <div className="space-y-2">
                 <h1 className="text-2xl font-bold tracking-tighter sm:text-4xl md:text-5xl lg:text-4xl">
-                  whistl response
+                  whistl
                 </h1>
+                an emergency response platform
                 <p className="mx-auto max-w-[700px] text-muted-foreground md:text-xl">
-                  for keeping us safe and connected through the storm.
+                  sound the alarm, secure your team.
                 </p>
               </div>
               <div className="space-x-4">
-                {(user && isAdmin) ? (
+                {(user) ? (
                   <>
-                    <Link href="/admin">
+                    {isAdmin ? <Link href="/admin">
                       <Button size="lg" className="bg-primary">
-                        Create Alert
-                        <AlertCircle className="ml-2 h-4 w-4" />
+                        Alert
                       </Button>
-                    </Link>
+                    </Link> : <Link href="/channels"><Button size="lg" className="bg-primary">Get help</Button></Link> }
                     <Link href="/prepare">
                       <Button variant="outline" size="lg">
                         Prepare
-                        <BookOpen className="ml-2 h-4 w-4" />
                       </Button>
                     </Link>
                   </>
