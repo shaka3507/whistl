@@ -1,12 +1,8 @@
 ## whistl
 
-The Emergency Preparedness feature allows users to:
+emergency prep app:
 
-1. Browse categories of emergencies (e.g., Earthquake, Tsunami, Wildfire)
-2. See recommended items for each emergency type
-3. Create personalized preparation lists with custom quantities
-4. Save and manage their preparation lists
-5. (Coming soon) Share lists with channels and allow members to claim items
+tktk
 
 ### Database Structure
 

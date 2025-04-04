@@ -1,12 +1,6 @@
 # Emergency Preparedness Feature
 
-This directory contains the code for the Emergency Preparedness feature of the Whistl application. This feature allows users to:
-
-1. View different emergency categories (Earthquake, Tsunami, etc.)
-2. Select a category to see recommended preparedness items
-3. Create personalized preparation lists with custom quantities
-4. Save and manage their preparation lists
-5. (Coming soon) Share lists with channel members and allow them to claim items
+tktk
 
 ## Database Structure
 
