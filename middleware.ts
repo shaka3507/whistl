@@ -74,9 +74,9 @@ export async function middleware(req: NextRequest) {
 
   // If no session and trying to access protected route
   if (cachedValue === false && isProtectedRoute) {
-    const redirectUrl = new URL("/login", req.url)
-    redirectUrl.searchParams.set("redirectedFrom", req.nextUrl.pathname)
-    return NextResponse.redirect(redirectUrl)
+    // const redirectUrl = new URL("/login", req.url)
+    // redirectUrl.searchParams.set("redirectedFrom", req.nextUrl.pathname)
+    // return NextResponse.redirect(redirectUrl)
   }
 
   return res
