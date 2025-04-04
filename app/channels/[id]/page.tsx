@@ -58,6 +58,7 @@ export default function ChannelPage() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [alertAcknowledged, setAlertAcknowledged] = useState(false)
   const [showAcknowledgePrompt, setShowAcknowledgePrompt] = useState(false)
+  const [dismissedNotifications, setDismissedNotifications] = useState<string[]>([])
 
   useEffect(() => {
     const fetchChannelData = async () => {
@@ -387,6 +388,10 @@ export default function ChannelPage() {
     checkAcknowledgment()
   }, [user, alert, supabase])
 
+  const dismissNotification = (notificationId: string) => {
+    setDismissedNotifications(prev => [...prev, notificationId]);
+  };
+
   if (isLoading) {
     return (
       <div className="flex min-h-screen flex-col">
@@ -544,27 +549,30 @@ export default function ChannelPage() {
                           .join("")
                       : "U"
 
-                    if (isNotification) {
+                    if (isNotification && !dismissedNotifications.includes(message.id)) {
                       return (
                         <div
                           key={message.id}
-                          className="bg-amber-50 border border-amber-200 rounded-lg p-4 mx-auto max-w-2xl"
+                          className="fixed inset-0 flex items-center justify-center z-50"
                         >
-                          <div className="flex items-center gap-2 mb-2">
-                            <Bell className="h-4 w-4 text-amber-500" />
-                            <span className="font-medium text-amber-800">
-                              Notification from {message.profiles.full_name}
-                            </span>
+                          <div 
+                            className="bg-red-300 border rounded-lg p-4 mx-4 my-auto max-w-2xl shadow-lg w-full sm:w-auto"
+                          >
+                            <div className="flex items-center gap-2 mb-2">
+                              <span className="font-medium text-black">
+                                Notification from {message.profiles.full_name}
+                              </span>
+                            </div>
+                            <p className="text-black">{message.content}</p>
+                            <div className="mt-2 text-xs text-black">
+                              {new Date(message.created_at).toLocaleString()}
+                            </div>
+                            <div className="mt-2">
+                              <Button variant="outline" onClick={() => dismissNotification(message.id)}>
+                                Acknowledge
+                              </Button>
+                            </div>
                           </div>
-                          <p className="text-amber-900">{message.content}</p>
-                          <div className="mt-2 text-xs text-amber-700">
-                            {new Date(message.created_at).toLocaleString()}
-                          </div>
-                          {message.user_id !== user?.id && <div>
-                            <Button variant="outline" onClick={acknowledgeAlert}>
-                              Acknowledge
-                            </Button>
-                          </div>}
                         </div>
                       )
                     }
