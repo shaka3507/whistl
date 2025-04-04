@@ -1,21 +1,25 @@
-"use client"
+"use client";
 
-import { Header } from "@/components/header"
-import { Button } from "@/components/ui/button"
-import Link from "next/link"
-import { AlertTriangle, ArrowRight, MessageSquare, Shield, Clock, AlertCircle, BookOpen } from "lucide-react"
-import { useAuth } from "@/context/auth-context"
-import { supabase } from "@/lib/supabase"
+import { Header } from "@/components/header";
+import { Button } from "@/components/ui/button";
+import Link from "next/link";
+import {
+  AlertTriangle,
+  ArrowRight,
+  MessageSquare,
+  Clock,
+} from "lucide-react";
+import { useAuth } from "@/context/auth-context";
 
 export default function Home() {
-  const { user, isAdmin } = useAuth()
+  const { user, isAdmin } = useAuth();
   return (
     <div className="flex min-h-screen flex-col">
       <Header />
       <main className="flex-1">
-        <section className="w-full min-h-[80vh] flex items-center justify-center py-12 md:py-24 lg:py-32 bg-background">
+        <section className="w-full min-h-[80vh] flex items-center justify-center py-4 md:py-16 lg:py-8 bg-background">
           <div className="container px-4 md:px-6">
-            <div className="flex flex-col items-center justify-center space-y-4 text-center">
+            <div className="flex flex-col items-center justify-center space-y-2 text-center">
               <div className="space-y-2">
                 <h1 className="text-2xl font-bold tracking-tighter sm:text-4xl md:text-5xl lg:text-4xl">
                   whistl
@@ -26,13 +30,21 @@ export default function Home() {
                 </p>
               </div>
               <div className="space-x-4">
-                {(user) ? (
+                {user ? (
                   <>
-                    {isAdmin ? <Link href="/admin">
-                      <Button size="lg" className="bg-primary">
-                        Alert
-                      </Button>
-                    </Link> : <Link href="/channels"><Button size="lg" className="bg-primary">Get help</Button></Link> }
+                    {isAdmin ? (
+                      <Link href="/admin">
+                        <Button size="lg" className="bg-primary">
+                          Alert
+                        </Button>
+                      </Link>
+                    ) : (
+                      <Link href="/channels">
+                        <Button size="lg" className="bg-primary">
+                          Get help
+                        </Button>
+                      </Link>
+                    )}
                     <Link href="/prepare">
                       <Button variant="outline" size="lg">
                         Prepare
@@ -58,43 +70,47 @@ export default function Home() {
             </div>
           </div>
         </section>
-        {!user &&
-        <section className="w-full py-12 md:py-24 lg:py-32 bg-muted/50">
-          <div className="container px-4 md:px-6">
-            <div className="mx-auto grid max-w-5xl items-center gap-6 py-12 lg:grid-cols-3">
-              <div className="flex flex-col justify-center space-y-4">
-                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white/10 text-white">
-                  <AlertTriangle className="h-6 w-6" />
-                </div>
-                <h3 className="text-xl font-bold">Immediate Alerts</h3>
-                <p className="text-muted-foreground">
-                  Send critical notifications to all team members instantly.
-                </p>
-              </div>
-              <div className="flex flex-col justify-center space-y-4">
-                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white/10 text-white">
-                  <MessageSquare className="h-6 w-6" />
-                </div>
-                <h3 className="text-xl font-bold">Secure Communication</h3>
-                <p className="text-muted-foreground">
-                  End-to-end encrypted channels for sensitive information exchange.
-                </p>
-              </div>
-              <div className="flex flex-col justify-center space-y-4">
-                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white/10 text-white">
-                  <Clock className="h-6 w-6" />
-                </div>
-                <h3 className="text-xl font-bold">Real-time Updates</h3>
-                <p className="text-muted-foreground">
-                  Stay informed with live situation updates and status changes.
-                </p>
+        {!user && (
+          <section className="w-full">
+            <div className="container px-4 md:px-6">
+              <div className="mx-auto grid max-w-5xl items-center gap-4 py-8 lg:grid-cols-3">
+                {[
+                  {
+                    icon: AlertTriangle,
+                    title: "alert",
+                    description:
+                      "Stay informed with live situation updates and status changes.",
+                  },
+                  {
+                    icon: MessageSquare,
+                    title: "gather and disperse",
+                    description:
+                      "Ensure your community has the supplies and information they need.",
+                  },
+                  {
+                    icon: Clock,
+                    title: "prepare",
+                    description:
+                      "Stay informed and prepared for any situation.",
+                  },
+                ].map((item, index) => (
+                  <div
+                    key={index}
+                    className="card flex flex-col justify-center space-y-4 text-center p-6 shadow-lg rounded-lg bg-white/10 text-white"
+                  >
+                    <div className="flex items-center justify-center h-12 w-full">
+                      <item.icon className="h-6 w-6" />
+                    </div>
+                    <h3 className="text-xl font-bold">{item.title}</h3>
+                    <p className="text-muted-foreground">{item.description}</p>
+                  </div>
+                ))}
               </div>
             </div>
-          </div>
-        </section>
-        }
+          </section>
+        )}
       </main>
-      <footer className="border-t py-6 md:py-0">
+      <footer className="border-t py-3 md:py-2">
         <div className="container flex flex-col items-center justify-between gap-4 md:h-24 md:flex-row">
           <p className="text-center text-sm leading-loose text-muted-foreground md:text-left">
             © 2025 whistl response. All rights reserved.
@@ -102,6 +118,5 @@ export default function Home() {
         </div>
       </footer>
     </div>
-  )
+  );
 }
-

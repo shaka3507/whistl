@@ -47,9 +47,10 @@ export function Header() {
         </div>
         {/* Desktop Navigation */}
         <nav className="hidden md:flex gap-6">
+        {user && (
           <Link href="/" className="text-sm font-medium">
-            Home
-          </Link>
+          Home
+        </Link> )}
           {user && (
             <Link href="/prepare" className="text-sm font-medium">
               Prepare
