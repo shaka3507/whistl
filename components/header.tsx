@@ -23,6 +23,8 @@ import {
 export function Header() {
   const { user, profile, signOut, isAdmin } = useAuth();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [notifications, setNotifications] = useState([]);
+  // stub - we will get this from the database
 
   const initials = profile?.full_name
     ? profile.full_name
@@ -71,7 +73,7 @@ export function Header() {
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="icon" className="relative">
                     <Bell className="h-5 w-5" />
-                    <span className="absolute top-0 right-0 h-2 w-2 rounded-full bg-red-500" />
+                    {notifications.length > 0 && <span className="absolute top-0 right-0 h-2 w-2 rounded-full bg-red-500" />}
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
