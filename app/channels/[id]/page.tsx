@@ -533,7 +533,7 @@ export default function ChannelPage() {
                 </DialogTrigger>
                 <DialogContent>
                   <DialogHeader>
-                    <DialogTitle>Channel Members</DialogTitle>
+                    <DialogTitle>Group Members</DialogTitle>
                     <DialogDescription>
                       {members.length} members in this channel
                     </DialogDescription>
@@ -562,6 +562,7 @@ export default function ChannelPage() {
                     ))}
                   </div>
                   {isAdmin && (
+                    <>
                     <form onSubmit={handleInviteUser} className="mt-4">
                       <div className="flex gap-2">
                         <Input
@@ -574,6 +575,9 @@ export default function ChannelPage() {
                         <Button type="submit">Invite</Button>
                       </div>
                     </form>
+                    <span className="text-muted-foreground text-sm text-center block">- or -</span>
+                    <Button variant="outline" onClick={() => console.log("upload members")}>upload members</Button>
+                    </>
                   )}
                 </DialogContent>
               </Dialog>
@@ -679,7 +683,7 @@ export default function ChannelPage() {
                   <MessageSquare className="h-12 w-12 text-muted-foreground mb-4" />
                   <h3 className="text-lg font-medium">No messages yet</h3>
                   <p className="text-sm text-muted-foreground mt-2 max-w-md">
-                    Start the conversation by sending a message below.
+                    Have a question? Ask your group. Want to give a status update? Tell your group.
                   </p>
                 </div>
               ) : (
