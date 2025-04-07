@@ -67,16 +67,16 @@ export async function middleware(req: NextRequest) {
   }
 
   // Protected routes - make this more specific to only include routes that need protection
-  const protectedRoutes = ["/admin", "/profile"]
+  const protectedRoutes = ["/admin", "/channels"]
   const isProtectedRoute = protectedRoutes.some(
     (route) => req.nextUrl.pathname === route || req.nextUrl.pathname.startsWith(`${route}/`),
   )
 
   // If no session and trying to access protected route
-  if (cachedValue === false && isProtectedRoute) {
-    // const redirectUrl = new URL("/login", req.url)
-    // redirectUrl.searchParams.set("redirectedFrom", req.nextUrl.pathname)
-    // return NextResponse.redirect(redirectUrl)
+  if (!session && isProtectedRoute) {
+    const redirectUrl = new URL("/login", req.url)
+    redirectUrl.searchParams.set("redirectedFrom", req.nextUrl.pathname)
+    return NextResponse.redirect(redirectUrl)
   }
 
   return res

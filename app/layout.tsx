@@ -4,6 +4,7 @@ import type { Metadata } from "next"
 import { Manrope } from "next/font/google"
 import { ThemeProvider } from "@/components/theme-provider"
 import { AuthProvider } from "@/context/auth-context"
+import { Toaster } from "@/components/ui/toaster"
 
 const manrope = Manrope({ 
   subsets: ["latin"],
@@ -29,6 +30,7 @@ export default function RootLayout({
       <body className={manrope.className}>
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem>
           <AuthProvider>{children}</AuthProvider>
+          <Toaster />
         </ThemeProvider>
       </body>
     </html>

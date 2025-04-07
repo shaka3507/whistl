@@ -803,10 +803,7 @@ export default function ChannelPage() {
                         onChange={(e) => setNewMessage(e.target.value)}
                         disabled={isSending}
                       />
-                      <Button
-                        type="submit"
-                        disabled={isSending || !newMessage.trim()}
-                      >
+                      <Button type="submit" disabled={isSending || !newMessage.trim()}>
                         <Send className="h-4 w-4" />
                       </Button>
                     </form>
