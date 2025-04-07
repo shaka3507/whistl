@@ -23,6 +23,12 @@ type Channel = Database["public"]["Tables"]["channels"]["Row"] & {
   alerts: Database["public"]["Tables"]["alerts"]["Row"][] | null
 }
 
+type User = Database["public"]["Tables"]["profiles"]["Row"] & {
+  last_message_time?: string | null
+  email?: string
+  is_admin?: boolean
+}
+
 export default function AdminPage() {
   const { user, isAdmin } = useAuth()
   
@@ -43,6 +49,9 @@ export default function AdminPage() {
     selected: boolean;
   }>>([])
   const [channels, setChannels] = useState<Channel[]>([])
+  const [users, setUsers] = useState<User[]>([])
+  const [isLoadingUsers, setIsLoadingUsers] = useState(true)
+  const [userError, setUserError] = useState<string | null>(null)
 
   const handleCreateAlert = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -155,6 +164,49 @@ export default function AdminPage() {
     }
 
     fetchChannels()
+  }, [user])
+
+  useEffect(() => {
+    const fetchUsers = async () => {
+      if (!user) return
+
+      try {
+        // Get all users and their last message times
+        const { data, error } = await supabase
+          .from("profiles")
+          .select(`
+            *,
+            messages!messages_user_id_fkey (
+              created_at
+            )
+          `)
+          .order("username", { ascending: true })
+
+        if (error) {
+          throw error
+        }
+
+        // Process the data to get the most recent message time for each user
+        const processedUsers = data.map(user => ({
+          ...user,
+          last_message_time: user.messages && user.messages.length > 0 
+            ? user.messages.reduce((latest: string, msg: { created_at: string }) => 
+                new Date(msg.created_at) > new Date(latest) ? msg.created_at : latest, 
+                user.messages[0].created_at
+              )
+            : null
+        }))
+
+        setUsers(processedUsers)
+      } catch (err: any) {
+        console.error("Error fetching users:", err)
+        setUserError(err.message || "Failed to load users")
+      } finally {
+        setIsLoadingUsers(false)
+      }
+    }
+
+    fetchUsers()
   }, [user])
 
   return (
@@ -273,17 +325,60 @@ export default function AdminPage() {
           </TabsContent>
 
           <TabsContent value="manage-users">
-            <Card>
-              <CardHeader>
-                <CardTitle>Manage Users</CardTitle>
-                <CardDescription>View and manage user permissions</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <p className="text-muted-foreground">
-                  User management functionality will be implemented in a future update.
-                </p>
-              </CardContent>
-            </Card>
+            <div className="space-y-4">
+              {isLoadingUsers ? (
+                <div className="flex justify-center p-8">
+                  <div className="animate-pulse">Loading users...</div>
+                </div>
+              ) : userError ? (
+                <div className="rounded-md bg-red-50 p-4">
+                  <div className="flex">
+                    <div className="flex-shrink-0">
+                      <AlertTriangle className="h-5 w-5 text-red-400" />
+                    </div>
+                    <div className="ml-3">
+                      <h3 className="text-sm font-medium text-red-800">{userError}</h3>
+                    </div>
+                  </div>
+                </div>
+              ) : users.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  No users found.
+                </div>
+              ) : (
+                <div className="grid gap-4">
+                  {users.map((user) => (
+                    <Card key={user.id}>
+                      <CardHeader>
+                        <CardTitle>{user.full_name || user.username}</CardTitle>
+                        <CardDescription>
+                          {user.email}
+                          {user.last_message_time && (
+                            <div className="mt-2 text-sm text-muted-foreground">
+                              Last active: {new Date(user.last_message_time).toLocaleString()}
+                            </div>
+                          )}
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-2">
+                            <span className={`px-2 py-1 rounded text-sm ${
+                              user.is_admin ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'
+                            }`}>
+                              {user.is_admin ? 'Admin' : 'User'}
+                            </span>
+                          </div>
+                          <Button variant="outline" size="sm">
+                            Manage Permissions
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </div>
           </TabsContent>
 
           <TabsContent value="active-alerts">
