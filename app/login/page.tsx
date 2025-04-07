@@ -1,133 +1,99 @@
 "use client"
 
-import type React from "react"
-
-import { useState, useEffect } from "react"
-import Link from "next/link"
-import { useRouter } from "next/navigation"
+import { useState } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 import { useAuth } from "@/context/auth-context"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { AlertTriangle } from "lucide-react"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import Link from "next/link"
 
 export default function LoginPage() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
-  const { signIn, user } = useAuth()
+  const { signIn } = useAuth()
   const router = useRouter()
-  
-  // Move the redirection logic to useEffect
-  useEffect(() => {
-    if (user) {
-      router.push("/channels")
-    }
-  }, [user, router])
+  const searchParams = useSearchParams()
+  const redirectedFrom = searchParams.get("redirectedFrom")
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setIsLoading(true)
     setError(null)
+    setIsLoading(true)
 
     try {
+      console.log("Starting login process...");
       const { error } = await signIn(email, password)
+
       if (error) {
+        console.error("Login error:", error);
         setError(error.message)
-      } else {
-        router.push("/channels")
+        setIsLoading(false)
+        return
       }
+
+      console.log("Login successful, waiting for redirect...");
+      // The auth state change handler will handle the redirect
+      // We just need to wait for it to complete
+      setIsLoading(false)
+      router.push("/")
     } catch (err) {
-      setError("An unexpected error occurred")
-      console.error(err)
-    } finally {
+      console.error("Unexpected error during login:", err);
+      setError("An unexpected error occurred. Please try again.")
       setIsLoading(false)
     }
   }
 
-  // If the user is already authenticated, show a loading state
-  if (user) {
-    return <div className="flex min-h-screen items-center justify-center">Loading...</div>
-  }
-
   return (
-    <div className="flex min-h-screen flex-col">
-      <div className="flex flex-1 flex-col justify-center px-6 py-12 lg:px-8">
-        <div className="sm:mx-auto sm:w-full sm:max-w-sm">
-          <div className="flex justify-center">
-            <AlertTriangle className="h-10 w-10 text-blue-500" />
-          </div>
-          <h2 className="mt-6 text-center text-2xl font-bold leading-9 tracking-tight">Sign in to your account</h2>
-        </div>
-
-        <div className="mt-10 sm:mx-auto sm:w-full sm:max-w-sm">
-          <form className="space-y-6" onSubmit={handleSubmit}>
-            <div>
-              <Label htmlFor="email">Email address</Label>
-              <div className="mt-2">
-                <Input
-                  id="email"
-                  name="email"
-                  type="email"
-                  autoComplete="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                />
-              </div>
+    <div className="container flex h-screen w-screen flex-col items-center justify-center">
+      <Card className="w-full max-w-md">
+        <CardHeader>
+          <CardTitle>Login</CardTitle>
+          <CardDescription>
+            Enter your email and password to access your account
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="email">Email</Label>
+              <Input
+                id="email"
+                type="email"
+                placeholder="you@example.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+              />
             </div>
-
-            <div>
-              <div className="flex items-center justify-between">
-                <Label htmlFor="password">Password</Label>
-                <div className="text-sm">
-                  <Link href="/forgot-password" className="font-semibold text-blue-600 hover:text-blue-500">
-                    Forgot password?
-                  </Link>
-                </div>
-              </div>
-              <div className="mt-2">
-                <Input
-                  id="password"
-                  name="password"
-                  type="password"
-                  autoComplete="current-password"
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                />
-              </div>
+            <div className="space-y-2">
+              <Label htmlFor="password">Password</Label>
+              <Input
+                id="password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+              />
             </div>
-
             {error && (
-              <div className="rounded-md bg-blue-50 p-4">
-                <div className="flex">
-                  <div className="flex-shrink-0">
-                    <AlertTriangle className="h-5 w-5 text-blue-400" />
-                  </div>
-                  <div className="ml-3">
-                    <h3 className="text-sm font-medium text-blue-800">{error}</h3>
-                  </div>
-                </div>
-              </div>
+              <div className="text-sm text-red-500">{error}</div>
             )}
-
-            <div>
-              <Button type="submit" className="w-full bg-blue-50 bg-blue-400 text-color-white" disabled={isLoading}>
-                {isLoading ? "Signing in..." : "Sign in"}
-              </Button>
-            </div>
+            <Button type="submit" className="w-full" disabled={isLoading}>
+              {isLoading ? "Signing in..." : "Sign in"}
+            </Button>
           </form>
-
-          <p className="mt-10 text-center text-sm text-gray-500">
-            Not a member?{" "}
-            <Link href="/signup" className="font-semibold leading-6 text-blue-600 hover:text-blue-500">
-              Sign up now
+          <div className="mt-4 text-center text-sm">
+            Don't have an account?{" "}
+            <Link href="/signup" className="text-primary hover:underline">
+              Sign up
             </Link>
-          </p>
-        </div>
-      </div>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   )
 }

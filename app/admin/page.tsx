@@ -12,14 +12,20 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { supabase } from "@/lib/supabase"
-import { AlertTriangle } from "lucide-react"
+import { AlertTriangle, MessageSquare, Plus } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { AlertPreparationItems } from "@/components/ui/alert-preparation-items"
-// import { AlertPreparationItemsList } from "@/components/ui/alert-preparation-items-list"
+import Link from "next/link"
+import type { Database } from "@/lib/supabase-types"
+
+type Channel = Database["public"]["Tables"]["channels"]["Row"] & {
+  alerts: Database["public"]["Tables"]["alerts"]["Row"][] | null
+}
 
 export default function AdminPage() {
   const { user, isAdmin } = useAuth()
+  
   console.log('Admin access check:', { userId: user?.id, isAdmin })
   const router = useRouter()
   const [isLoading, setIsLoading] = useState(false)
@@ -36,7 +42,7 @@ export default function AdminPage() {
     unit: string;
     selected: boolean;
   }>>([])
-
+  const [channels, setChannels] = useState<Channel[]>([])
 
   const handleCreateAlert = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -120,6 +126,36 @@ export default function AdminPage() {
       setIsLoading(false)
     }
   }
+
+  useEffect(() => {
+    const fetchChannels = async () => {
+      if (!user) return
+
+      try {
+        // Get all channels with their alerts
+        const { data, error } = await supabase
+          .from("channels")
+          .select(`
+            *,
+            alerts(*)
+          `)
+          .order("created_at", { ascending: false })
+
+        if (error) {
+          throw error
+        }
+
+        setChannels(data || [])
+      } catch (err: any) {
+        console.error("Error fetching channels:", err)
+        setError(err.message || "Failed to load channels")
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    fetchChannels()
+  }, [user])
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -251,17 +287,69 @@ export default function AdminPage() {
           </TabsContent>
 
           <TabsContent value="active-alerts">
-            <Card>
-              <CardHeader>
-                <CardTitle>Active Alerts</CardTitle>
-                <CardDescription>View and manage active emergency alerts</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <p className="text-muted-foreground">
-                  Active alerts management will be implemented in a future update.
-                </p>
-              </CardContent>
-            </Card>
+            <div className="space-y-4">
+              {isLoading ? (
+                <div className="flex justify-center p-8">
+                  <div className="animate-pulse">Loading alerts...</div>
+                </div>
+              ) : error ? (
+                <div className="rounded-md bg-red-50 p-4">
+                  <div className="flex">
+                    <div className="flex-shrink-0">
+                      <AlertTriangle className="h-5 w-5 text-red-400" />
+                    </div>
+                    <div className="ml-3">
+                      <h3 className="text-sm font-medium text-red-800">{error}</h3>
+                    </div>
+                  </div>
+                </div>
+              ) : channels.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  No active alerts found.
+                </div>
+              ) : (
+                <div className="grid gap-4">
+                  {channels.map((channel) => (
+                    <Card key={channel.id}>
+                      <CardHeader>
+                        <CardTitle>{channel.name}</CardTitle>
+                        <CardDescription>{channel.description}</CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        {channel.alerts && channel.alerts.length > 0 ? (
+                          <div className="space-y-4">
+                            {channel.alerts.map((alert) => (
+                              <div key={alert.id}>
+                                <div className="flex items-center justify-between">
+                                  <span className={`px-2 py-1 rounded text-sm ${
+                                    alert.severity === 'critical' ? 'bg-red-100 text-red-800' :
+                                    alert.severity === 'high' ? 'bg-orange-100 text-orange-800' :
+                                    alert.severity === 'medium' ? 'bg-yellow-100 text-yellow-800' :
+                                    'bg-green-100 text-green-800'
+                                  }`}>
+                                    {alert.severity}
+                                  </span>
+                                </div>
+                                <div className="mt-4">
+                                  <Link href={`/channels/${channel.id}`}>
+                                    <Button variant="outline" size="sm">
+                                      <MessageSquare className="mr-2 h-4 w-4" />
+                                      View Channel
+                                    </Button>
+                                  </Link>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-muted-foreground">No alerts in this channel.</p>
+                        )}
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </div>
           </TabsContent>
         </Tabs>
       </main>

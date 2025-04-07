@@ -6,6 +6,7 @@ import React, {
   useEffect,
   useState,
   useCallback,
+  useRef,
 } from "react";
 import { supabase } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
@@ -19,6 +20,7 @@ interface AuthContextType {
   profile: Profile | null;
   session: Session | null;
   isLoading: boolean;
+  isAdmin: boolean;
   signIn: (
     email: string,
     password: string,
@@ -29,7 +31,7 @@ interface AuthContextType {
     fullName: string,
   ) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
-  isAdmin: boolean;
+  updateProfile: (updates: Partial<Profile>) => Promise<{ error: Error | null }>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -44,7 +46,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [retryCount, setRetryCount] = useState(0);
+  const [isAdmin, setIsAdmin] = useState(false);
   const router = useRouter();
+  const redirectAttempted = useRef(false);
 
   const fetchProfile = useCallback(async (userId: string) => {
     try {
@@ -123,15 +127,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log("Auth state changed:", event, session);
       setSession(session);
       setUser(session ? session.user : null);
       
       if (session?.user) {
-        fetchProfile(session.user.id);
+        console.log("User authenticated, fetching profile...");
+        await fetchProfile(session.user.id);
         localStorage.setItem("sb-user", JSON.stringify(session.user));
+        
+        // Check if user is admin
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("is_admin")
+          .eq("id", session.user.id)
+          .single();
+        
+        setIsAdmin(profile?.is_admin || false);
       } else {
+        console.log("No session, clearing user data");
         setProfile(null);
+        setIsAdmin(false);
         localStorage.removeItem("sb-user");
       }
       
@@ -146,54 +163,108 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => subscription.unsubscribe();
   }, [initializeAuth, fetchProfile]);
 
+  useEffect(() => {
+    async function loadProfile() {
+      if (user) {
+        const { data: profile, error } = await supabase
+          .from("profiles")
+          .select("*")
+          .eq("id", user.id)
+          .single();
+
+        if (error) {
+          console.error("Error loading profile:", error);
+        } else {
+          setProfile(profile);
+        }
+      } else {
+        setProfile(null);
+      }
+    }
+
+    loadProfile();
+  }, [user]);
+
   const signIn = async (email: string, password: string) => {
     try {
-      const { error, data } = await supabase.auth.signInWithPassword({
+      console.log("Attempting to sign in...");
+      const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
-      if (error) return { error };
-
-      if (data.user) {
-        const displayName = email.split("@")[0];
-        const { error: profileError } = await supabase
-          .from("profiles")
-          .upsert({ id: data.user.id, full_name: displayName, is_admin: false });
-// 
-        if (profileError) console.error("Profile creation error:", profileError);
-        else await fetchProfile(data.user.id);
-        
-        // Cache the user data immediately
-        localStorage.setItem("sb-user", JSON.stringify(data.user));
-        localStorage.setItem("sb-auth-last-check", String(Date.now()));
+      if (error) {
+        console.error("Sign in error:", error);
+        return { error };
       }
 
-      router.refresh();
+      if (!data.session) {
+        console.error("No session after sign in");
+        return { error: new Error("Authentication failed") };
+      }
+
+      console.log("Sign in successful, checking admin status...");
+      
+      // Get the redirectedFrom parameter from the URL
+      const urlParams = new URLSearchParams(window.location.search);
+      const redirectedFrom = urlParams.get("redirectedFrom");
+      
+      // Check admin status
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("is_admin")
+        .eq("id", data.session.user.id)
+        .single();
+      
+      setIsAdmin(profile?.is_admin || false);
+      
+      // Update local state
+      setSession(data.session);
+      setUser(data.session.user);
+      await fetchProfile(data.session.user.id);
+      
+      console.log("Redirecting to:", redirectedFrom || "/");
+      router.push(redirectedFrom || "/");
+      
       return { error: null };
-    } catch (err) {
-      console.error("Sign in error:", err);
-      return { error: new Error("An unexpected error occurred during sign in") };
+    } catch (error) {
+      console.error("Unexpected error during sign in:", error);
+      return { error: error as Error };
     }
   };
 
   const signUp = async (email: string, password: string, fullName: string) => {
-    const { error, data } = await supabase.auth.signUp({
-      email,
-      password,
-    });
+    try {
+      const { data, error: signUpError } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            full_name: fullName,
+          },
+        },
+      });
 
-    if (error) return { error };
-    if (!data.user) return { error: new Error("User signup failed") };
+      if (signUpError) throw signUpError;
 
-    const { error: profileError } = await supabase
-      .from("profiles")
-      .insert({ id: data.user.id, full_name: fullName, is_admin: false });
+      if (data.user) {
+        const { error: profileError } = await supabase
+          .from("profiles")
+          .insert([
+            {
+              id: data.user.id,
+              full_name: fullName,
+              updated_at: new Date().toISOString(),
+            },
+          ]);
 
-    if (profileError) console.error("Profile creation error:", profileError);
-    else router.refresh();
+        if (profileError) throw profileError;
+      }
 
-    return { error: null };
+      return { error: null };
+    } catch (error) {
+      return { error: error as Error };
+    }
   };
 
   const signOut = async () => {
@@ -205,17 +276,44 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     router.push("/");
   };
 
-  const isAdmin = profile?.is_admin ?? false;
+  const updateProfile = async (updates: Partial<Profile>) => {
+    if (!user) return { error: new Error("No user logged in") };
+
+    try {
+      const { error } = await supabase
+        .from("profiles")
+        .update({
+          ...updates,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", user.id);
+
+      if (error) throw error;
+
+      // Refresh profile data
+      const { data: updatedProfile } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", user.id)
+        .single();
+
+      setProfile(updatedProfile);
+      return { error: null };
+    } catch (error) {
+      return { error: error as Error };
+    }
+  };
 
   const value = {
     user,
     profile,
     session,
     isLoading,
+    isAdmin,
     signIn,
     signUp,
     signOut,
-    isAdmin,
+    updateProfile,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -1,4 +1,10 @@
-export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[]
+export type Json =
+  | string
+  | number
+  | boolean
+  | null
+  | { [key: string]: Json | undefined }
+  | Json[]
 
 export interface Database {
   public: {
@@ -116,30 +122,38 @@ export interface Database {
       profiles: {
         Row: {
           id: string
-          updated_at: string | null
-          username: string | null
           full_name: string | null
+          username: string | null
           avatar_url: string | null
-          is_admin: boolean
+          updated_at: string
         }
         Insert: {
           id: string
-          updated_at?: string | null
-          username?: string | null
           full_name?: string | null
+          username?: string | null
           avatar_url?: string | null
-          is_admin?: boolean
+          updated_at?: string
         }
         Update: {
           id?: string
-          updated_at?: string | null
-          username?: string | null
           full_name?: string | null
+          username?: string | null
           avatar_url?: string | null
-          is_admin?: boolean
+          updated_at?: string
         }
       }
     }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      [_ in never]: never
+    }
+    Enums: {
+      [_ in never]: never
+    }
   }
 }
+
+
 
