@@ -21,17 +21,18 @@ export default function PreparePage() {
   
   // All cards data
   const allCards: CardData[] = [
-    { id: "kit", title: "Emergency kit essentials", href: "/prepare/create-plan" },
-    { id: "weather", title: "Learn more about extreme weather events in your area", href: "/prepare/weather" },
-    { id: "plan", title: "Create a plan for the next disaster", href: "/prepare/create-plan" },
-    { id: "events", title: "Upcoming events", href: "/prepare/create-plan" },
-    { id: "fire-drills", title: "Mitigate risk", href: "/prepare/create-plan" },
-    { id: "test", title: "Think you know it already? Test your knowledge", href: "/prepare/test" },
-    { id: "fire-history", title: "The history of fire drills", href: "/prepare/create-plan" },
-    { id: "test-2", title: "Think you know it already? Test your knowledge", href: "/prepare/test" },
-    { id: "kit-2", title: "Emergency kit essentials", href: "/prepare/create-plan" },
-    { id: "hurricane", title: "Hurricane season", href: "/prepare/create-plan" },
-    { id: "snow", title: "Lake effect snow", href: "/prepare/create-plan" },
+    { id: "kit", title: "Emergency Kit Essentials: Your Lifeline in Crisis", href: "/prepare/emergency-kit" },
+    { id: "hurricane", title: "Hurricane Preparedness: Before, During & After", href: "/prepare/hurricane" },
+    { id: "tornado", title: "Tornado Safety: Your Quick-Action Guide", href: "/prepare/tornado" },
+    { id: "flood", title: "Flood Survival: Rising Waters, Rising Awareness", href: "/prepare/flood" },
+    { id: "wildfire", title: "Wildfire Preparedness: Stay Safe in the Heat", href: "/prepare/wildfire" },
+    { id: "winter", title: "Winter Storm Survival: Beat the Freeze", href: "/prepare/winter-storm" },
+    { id: "heatwave", title: "Heat Wave Safety: Cool Tips for Hot Days", href: "/prepare/heatwave" },
+    { id: "thunderstorm", title: "Thunderstorm Safety: Weather the Storm", href: "/prepare/thunderstorm" },
+    { id: "earthquake", title: "Earthquake Preparedness: Shake, Rattle & Ready", href: "/prepare/earthquake" },
+    { id: "tsunami", title: "Tsunami Preparedness: Wave of Awareness", href: "/prepare/tsunami" },
+    { id: "family-plan", title: "Family Emergency Plan: Your Safety Blueprint", href: "/prepare/family-plan" },
+    { id: "pet-safety", title: "Pet Emergency Preparedness: Keep Your Furry Friends Safe", href: "/prepare/pet-safety" }
   ]
   
   // Filter cards based on search term
@@ -126,7 +127,7 @@ export default function PreparePage() {
 
         {/* Desktop Chat Agent Section */}
         <div className="hidden md:block mt-12">
-          <h2 className="text-2xl font-semibold mb-4">Ask Our AI Assistant</h2>
+          <h2 className="text-2xl font-semibold mb-4">Ask our whist.AI chat assistant</h2>
           <p className="text-gray-500 mb-4">Get instant answers about weather and crisis preparedness.</p>
           <ChatAgent />
         </div>
