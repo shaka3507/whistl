@@ -8,7 +8,8 @@ CREATE TABLE profiles (
   username TEXT UNIQUE,
   full_name TEXT,
   avatar_url TEXT,
-  is_admin BOOLEAN DEFAULT FALSE
+  is_admin BOOLEAN DEFAULT FALSE,
+  phone_number TEXT
 );
 
 -- Create channels table

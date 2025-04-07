@@ -126,6 +126,7 @@ export interface Database {
           username: string | null
           avatar_url: string | null
           updated_at: string
+          phone_number: string | null
         }
         Insert: {
           id: string
@@ -133,6 +134,7 @@ export interface Database {
           username?: string | null
           avatar_url?: string | null
           updated_at?: string
+          phone_number?: string | null
         }
         Update: {
           id?: string
@@ -140,6 +142,7 @@ export interface Database {
           username?: string | null
           avatar_url?: string | null
           updated_at?: string
+          phone_number?: string | null
         }
       }
     }

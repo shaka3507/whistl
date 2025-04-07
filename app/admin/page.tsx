@@ -12,7 +12,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { supabase } from "@/lib/supabase"
-import { AlertTriangle, MessageSquare, Plus } from "lucide-react"
+import { AlertTriangle, MessageSquare, Plus, Phone, Smartphone } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { AlertPreparationItems } from "@/components/ui/alert-preparation-items"
@@ -27,6 +27,8 @@ type User = Database["public"]["Tables"]["profiles"]["Row"] & {
   last_message_time?: string | null
   email?: string
   is_admin?: boolean
+  avatar_url?: string | null
+  phone_number?: string | null
 }
 
 export default function AdminPage() {
@@ -180,6 +182,7 @@ export default function AdminPage() {
               created_at
             )
           `)
+          .neq('id', user.id) // Exclude current user
           .order("username", { ascending: true })
 
         if (error) {
@@ -217,11 +220,26 @@ export default function AdminPage() {
           <h1 className="text-3xl font-bold">Admin Dashboard</h1>
         </div>
 
-        <Tabs defaultValue="create-alert">
-          <TabsList className="mb-4">
-            <TabsTrigger value="create-alert">Create Alert</TabsTrigger>
-            <TabsTrigger value="manage-users">Manage Users</TabsTrigger>
-            <TabsTrigger value="active-alerts">Active Alerts</TabsTrigger>
+        <Tabs defaultValue="create-alert" className="w-full">
+          <TabsList className="grid w-full grid-cols-3 mb-4">
+            <TabsTrigger 
+              value="create-alert" 
+              className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm"
+            >
+              Create Alert
+            </TabsTrigger>
+            <TabsTrigger 
+              value="manage-users"
+              className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm"
+            >
+              Manage Users
+            </TabsTrigger>
+            <TabsTrigger 
+              value="active-alerts"
+              className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm"
+            >
+              Active Alerts
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="create-alert">
@@ -349,29 +367,68 @@ export default function AdminPage() {
                 <div className="grid gap-4">
                   {users.map((user) => (
                     <Card key={user.id}>
-                      <CardHeader>
-                        <CardTitle>{user.full_name || user.username}</CardTitle>
-                        <CardDescription>
-                          {user.email}
-                          {user.last_message_time && (
-                            <div className="mt-2 text-sm text-muted-foreground">
-                              Last active: {new Date(user.last_message_time).toLocaleString()}
+                      <CardHeader className="flex flex-row items-center justify-between">
+                        <div className="flex items-center space-x-4">
+                          {user.avatar_url ? (
+                            <img
+                              src={user.avatar_url}
+                              alt={`${user.full_name || user.username}'s avatar`}
+                              className="h-12 w-12 rounded-full"
+                            />
+                          ) : (
+                            <div className="h-12 w-12 rounded-full bg-gray-200 flex items-center justify-center">
+                              <span className="text-gray-500 text-lg">
+                                {(user.full_name || user.username || '?')[0].toUpperCase()}
+                              </span>
                             </div>
                           )}
-                        </CardDescription>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center space-x-2">
-                            <span className={`px-2 py-1 rounded text-sm ${
-                              user.is_admin ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'
-                            }`}>
-                              {user.is_admin ? 'Admin' : 'User'}
-                            </span>
+                          <div>
+                            <CardTitle>{user.full_name || user.username}</CardTitle>
+                            <CardDescription>
+          
+                              {user.last_message_time && (
+                                <div className="mt-2 text-sm text-muted-foreground">
+                                  Last active: {new Date(user.last_message_time).toLocaleString()}
+                                </div>
+                              )}
+                            </CardDescription>
                           </div>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          {user.phone_number && (
+                            <>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => window.location.href = `tel:${user.phone_number}`}
+                              >
+                                <Phone className="h-4 w-4 mr-2" />
+                                Call
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => window.location.href = `sms:${user.phone_number}`}
+                              >
+                                <Smartphone className="h-4 w-4 mr-2" />
+                                Text
+                              </Button>
+                            </>
+                          )}
                           <Button variant="outline" size="sm">
                             Manage Permissions
                           </Button>
+                        </div>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-4">
+                          
+                          <div className="border-t pt-4">
+                            <h4 className="text-sm font-medium mb-2">Claimed Items</h4>
+                            <div className="text-sm text-muted-foreground">
+                              <p>Item claiming functionality will be implemented in a future update.</p>
+                            </div>
+                          </div>
                         </div>
                       </CardContent>
                     </Card>
