@@ -15,7 +15,7 @@ const manrope = Manrope({
 })
 
 export const metadata: Metadata = {
-  title: "Whistl",
+  title: "whistl - emergency preparedness platform",
   description: "Coordinate emergency response and crisis management",
   generator: 'v0.dev + shaka c'
 }

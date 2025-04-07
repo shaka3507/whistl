@@ -6,6 +6,8 @@ import { Card, CardContent, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Search } from "lucide-react"
 import Link from "next/link"
+import { ChatAgent } from "@/components/chat-agent"
+import { FloatingChatButton } from "@/components/floating-chat-button"
 
 // Card data structure
 interface CardData {
@@ -54,6 +56,7 @@ export default function PreparePage() {
       <div className="container py-8">
         <h1 className="text-3xl font-bold mb-4">Prepare Library</h1>
         <p className="text-gray-500 mb-8">Search for resources to help you prepare for disasters.</p>
+        
         <div className="relative mb-8">
           <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
             <Search className="h-5 w-5 text-gray-400" />
@@ -120,7 +123,17 @@ export default function PreparePage() {
             )}
           </>
         )}
+
+        {/* Desktop Chat Agent Section */}
+        <div className="hidden md:block mt-12">
+          <h2 className="text-2xl font-semibold mb-4">Ask Our AI Assistant</h2>
+          <p className="text-gray-500 mb-4">Get instant answers about weather and crisis preparedness.</p>
+          <ChatAgent />
+        </div>
       </div>
+
+      {/* Mobile Floating Chat Button */}
+      <FloatingChatButton />
     </div>
   )
 } 

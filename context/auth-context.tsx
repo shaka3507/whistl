@@ -223,8 +223,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(data.session.user);
       await fetchProfile(data.session.user.id);
       
-      console.log("Redirecting to:", redirectedFrom || "/");
-      router.push(redirectedFrom || "/");
+      // Handle redirect
+      if (redirectedFrom) {
+        router.push(redirectedFrom);
+      } else {
+        router.push("/");
+      }
       
       return { error: null };
     } catch (error) {

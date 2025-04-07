@@ -35,11 +35,8 @@ export default function LoginPage() {
         return
       }
 
-      console.log("Login successful, waiting for redirect...");
-      // The auth state change handler will handle the redirect
-      // We just need to wait for it to complete
+      console.log("Login successful, redirecting...");
       setIsLoading(false)
-      router.push("/")
     } catch (err) {
       console.error("Unexpected error during login:", err);
       setError("An unexpected error occurred. Please try again.")
