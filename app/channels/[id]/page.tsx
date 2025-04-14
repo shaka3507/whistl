@@ -102,7 +102,7 @@ export default function ChannelPage() {
           .from("channels")
           .select("*")
           .eq("id", id)
-          .single();
+        .single();
 
         if (channelError) {
           throw channelError;
@@ -597,19 +597,17 @@ export default function ChannelPage() {
                   <div className="mt-4">
                     {supplyItems.length > 0 ? (
                       <div className="space-y-4">
-                        <div className="grid grid-cols-3 gap-4 font-medium text-sm mb-4 border-b pb-2">
+                        <div className="grid grid-cols-2 gap-4 font-medium text-sm mb-4 border-b pb-2">
                           <div>Item</div>
                           <div>Available</div>
-                          <div>Action</div>
                         </div>
                         <div className="divide-y">
                           {supplyItems.map((item) => {
                             const remainingQuantity = getRemainingQuantity(item);
                             return (
-                              <div key={item.id} className="grid grid-cols-3 gap-4 py-4 items-center">
+                              <div key={item.id} className="grid grid-cols-2 gap-4 py-4 items-center">
                                 <div className="font-medium text-base">{item.name}</div>
-                                <div className="text-base">{remainingQuantity} / {item.quantity}</div>
-                                <div>
+                                <div className="text-base">
                                   {remainingQuantity > 0 ? (
                                     <Button 
                                       size="sm" 
@@ -617,7 +615,7 @@ export default function ChannelPage() {
                                       disabled={isAdmin} // Admins can't claim
                                       className="w-full sm:w-auto"
                                     >
-                                      Claim
+                                      Claim ({remainingQuantity} left)
                                     </Button>
                                   ) : (
                                     <span className="text-muted-foreground text-sm">Out of stock</span>

@@ -93,13 +93,14 @@ export default function WildfirePage() {
           </Card>
         </div>
 
-        <div className="bg-orange-100 p-8 rounded-lg shadow-md">
+        <div className="p-8 rounded-lg shadow-md">
           <h2 className="text-2xl font-bold mb-6 text-orange-900">Wildfire Safety Zones</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="p-6 bg-white rounded-lg shadow-sm">
-              <h3 className="font-bold text-lg mb-4 text-orange-800">Zone 1</h3>
-              <p className="text-gray-700 mb-2">0-30 feet from home</p>
-              <ul className="space-y-2 text-gray-700">
+            <div className="p-6 rounded-lg shadow-sm border-2 border-orange-200 relative">
+              <div className="absolute -top-3 -left-3 w-6 h-6 rounded-full bg-orange-500"></div>
+              <h3 className="font-bold text-lg mb-4 text-white">Zone 1: Immediate Perimeter</h3>
+              <p className="text-white mb-2">0-30 feet from home</p>
+              <ul className="space-y-2 text-white">
                 <li className="flex items-start">
                   <span className="mr-2">•</span>
                   <span>Remove all flammable materials</span>
@@ -114,10 +115,12 @@ export default function WildfirePage() {
                 </li>
               </ul>
             </div>
-            <div className="p-6 bg-white rounded-lg shadow-sm">
-              <h3 className="font-bold text-lg mb-4 text-orange-800">Zone 2</h3>
-              <p className="text-gray-700 mb-2">30-100 feet from home</p>
-              <ul className="space-y-2 text-gray-700">
+            <div className="p-6 rounded-lg shadow-sm border-2 border-orange-300 relative">
+              <div className="absolute -top-3 -left-3 w-6 h-6 rounded-full bg-orange-500"></div>
+              <div className="absolute -top-3 -left-3 w-8 h-8 rounded-full border-2 border-orange-300"></div>
+              <h3 className="font-bold text-lg mb-4 text-white">Zone 2: Intermediate Zone</h3>
+              <p className="text-white mb-2">30-100 feet from home</p>
+              <ul className="space-y-2 text-white">
                 <li className="flex items-start">
                   <span className="mr-2">•</span>
                   <span>Space trees 10 feet apart</span>
@@ -132,10 +135,13 @@ export default function WildfirePage() {
                 </li>
               </ul>
             </div>
-            <div className="p-6 bg-white rounded-lg shadow-sm">
-              <h3 className="font-bold text-lg mb-4 text-orange-800">Zone 3</h3>
-              <p className="text-gray-700 mb-2">100-200 feet from home</p>
-              <ul className="space-y-2 text-gray-700">
+            <div className="p-6 rounded-lg shadow-sm border-2 border-orange-400 relative">
+              <div className="absolute -top-3 -left-3 w-6 h-6 rounded-full bg-orange-500"></div>
+              <div className="absolute -top-3 -left-3 w-8 h-8 rounded-full border-2 border-orange-300"></div>
+              <div className="absolute -top-3 -left-3 w-10 h-10 rounded-full border-2 border-orange-400"></div>
+              <h3 className="font-bold text-lg mb-4 text-white">Zone 3: Extended Perimeter</h3>
+              <p className="text-white mb-2">100-200 feet from home</p>
+              <ul className="space-y-2 text-white">
                 <li className="flex items-start">
                   <span className="mr-2">•</span>
                   <span>Thin trees and brush</span>

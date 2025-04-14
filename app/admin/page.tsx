@@ -334,8 +334,8 @@ export default function AdminPage() {
                     </div>
                   )}
 
-                  <Button type="submit" form="create-alert-form" className="w-full bg-red-600 hover:bg-red-700" disabled={isLoading}>
-                    {isLoading ? "Creating..." : "Create Alert & Channel"}
+                  <Button type="submit" form="create-alert-form" className="w-full bg-red-200 hover:bg-red-700" disabled={isLoading}>
+                    {isLoading ? "Creating..." : "Start Alert"}
                   </Button>
                 </form>
               </CardContent>
