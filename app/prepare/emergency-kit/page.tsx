@@ -19,7 +19,7 @@ export default function EmergencyKitPage() {
                 <CheckCircle2 className="mr-2 text-green-500" />
                 Basic Supplies
               </CardTitle>
-              Start creating your emergency kit >
+              Start creating your emergency kit &gt;
             </CardContent>
           </Card>
 
@@ -29,13 +29,12 @@ export default function EmergencyKitPage() {
                 <Plus className="mr-2 text-blue-500" />
                 Personal Items
               </CardTitle>
-              Start collecting the items that matter to you most >
+              Start collecting the items that matter to you most &gt;
             </CardContent>
           </Card>
         </div>
 
-</div>
-
+      </div>
     </div>
   )
 } 

@@ -1,12 +1,12 @@
 "use client"
 
-import { useState } from "react"
+import { useState, memo } from "react"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { MessageSquare } from "lucide-react"
 import { ChatAgent } from "./chat-agent"
 
-export function FloatingChatButton() {
+function FloatingChatButtonComponent() {
   const [isOpen, setIsOpen] = useState(false)
 
   return (
@@ -29,10 +29,12 @@ export function FloatingChatButton() {
             <DialogTitle>whist.AI - ask crisis preparedness questions</DialogTitle>
           </DialogHeader>
           <div className="flex-1 overflow-hidden">
-            <ChatAgent />
+            {isOpen && <ChatAgent />}
           </div>
         </DialogContent>
       </Dialog>
     </>
   )
-} 
+}
+
+export const FloatingChatButton = memo(FloatingChatButtonComponent) 

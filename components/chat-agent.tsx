@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, useEffect } from "react"
+import { useState, useRef, useEffect, memo, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent } from "@/components/ui/card"
@@ -14,7 +14,7 @@ interface Message {
   content: string
 }
 
-export function ChatAgent() {
+function ChatAgentComponent() {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState("")
   const [isLoading, setIsLoading] = useState(false)
@@ -22,15 +22,15 @@ export function ChatAgent() {
   const [copiedMessageIndex, setCopiedMessageIndex] = useState<number | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
-  const scrollToBottom = () => {
+  const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
-  }
+  }, [])
 
   useEffect(() => {
     scrollToBottom()
-  }, [messages])
+  }, [messages, scrollToBottom])
 
-  const handleCopy = async (content: string, index: number) => {
+  const handleCopy = useCallback(async (content: string, index: number) => {
     try {
       await navigator.clipboard.writeText(content)
       setCopiedMessageIndex(index)
@@ -39,9 +39,9 @@ export function ChatAgent() {
     } catch (err) {
       toast.error("Failed to copy message")
     }
-  }
+  }, [])
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault()
     if (!input.trim() || isLoading) return
 
@@ -87,7 +87,7 @@ export function ChatAgent() {
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [input, isLoading, messages])
 
   return (
     <div className="w-full h-full flex flex-col">
@@ -162,4 +162,6 @@ export function ChatAgent() {
       </form>
     </div>
   )
-} 
+}
+
+export const ChatAgent = memo(ChatAgentComponent) 
