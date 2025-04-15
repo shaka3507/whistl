@@ -1,3 +1,88 @@
+# Prepare Library
+
+This directory contains the prepare library component of the application, which provides educational content about disaster preparedness.
+
+## Structure
+
+- `page.tsx` - The main prepare library page that lists all available topics
+- `[slug]/page.tsx` - Dynamic route handler for all individual topics
+- `../public/data/prepare/*.json` - JSON data files for each topic
+
+## Adding or Modifying Topics
+
+### 1. Update the Topic List
+
+To add a new topic to the library, edit the `allCards` array in `page.tsx`:
+
+```javascript
+const allCards: CardData[] = [
+  { id: "new-topic", title: "New Topic Title", href: "/prepare/new-topic" },
+  // ... existing topics
+]
+```
+
+### 2. Create the JSON Data File
+
+Create a new JSON file in the `public/data/prepare` directory with the same ID as your topic:
+
+```
+public/data/prepare/new-topic.json
+```
+
+The JSON file should follow this structure:
+
+```json
+{
+  "title": "Topic Title",
+  "description": "Short description of the topic",
+  "sections": [
+    {
+      "title": "Section Title",
+      "content": "Markdown-formatted content for this section"
+    },
+    // More sections...
+  ],
+  "resources": [
+    {
+      "title": "Resource Title",
+      "url": "https://example.com/resource"
+    },
+    // More resources...
+  ]
+}
+```
+
+### 3. Generating Placeholder Files
+
+You can use the script to generate placeholder JSON files for all topics:
+
+```
+node scripts/generate-prepare-json.js
+```
+
+This will create JSON files for any topics that don't already have them.
+
+## Markdown Support
+
+The content in each section supports Markdown formatting, including:
+
+- Headers (## for h2, ### for h3, etc.)
+- Lists (- or * for bullet points, 1. for numbered lists)
+- **Bold** and *italic* text
+- [Links](https://example.com)
+- Code blocks
+- And more
+
+## Sections
+
+Each topic should generally have at least these sections:
+
+1. Before the Disaster/Event
+2. During the Disaster/Event
+3. After the Disaster/Event
+
+Additional sections can be added as needed.
+
 # Emergency Preparedness Feature
 
 tktk

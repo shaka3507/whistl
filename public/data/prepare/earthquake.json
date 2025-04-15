@@ -1,0 +1,32 @@
+{
+  "title": "Earthquake Preparedness: Shake, Rattle & Ready",
+  "description": "Learn how to prepare for, survive during, and recover after an earthquake.",
+  "sections": [
+    {
+      "title": "Before an Earthquake",
+      "content": "## Prepare Your Home\n\n- Secure heavy furniture to walls\n- Install latches on cabinets\n- Know where gas, water, and electricity shutoffs are\n- Have an emergency kit ready\n- Create a family communication plan\n- Identify safe spots in each room (under sturdy tables, against interior walls)\n\n## Emergency Kit Essentials\n\n- Water (1 gallon per person per day for at least 3 days)\n- Non-perishable food (at least 3-day supply)\n- Battery-powered radio\n- Flashlight and extra batteries\n- First aid kit\n- Whistle to signal for help\n- Dust mask, plastic sheeting, and duct tape\n- Moist towelettes, garbage bags, and plastic ties\n- Wrench or pliers for utilities\n- Manual can opener\n- Local maps\n- Cell phone with chargers and backup battery"
+    },
+    {
+      "title": "During an Earthquake",
+      "content": "## If You're Inside\n\n- DROP to the ground\n- COVER by getting under a sturdy table or desk\n- HOLD ON until the shaking stops\n- Stay away from windows, outside doors, and walls\n- Stay in bed if you're there when an earthquake strikes\n- Do not use elevators\n\n## If You're Outside\n\n- Move away from buildings, streetlights, and utility wires\n- Once in the open, stay there until the shaking stops\n\n## If You're in a Vehicle\n\n- Stop as quickly and safely as possible\n- Avoid stopping near buildings, trees, overpasses, or utility wires\n- Stay in the vehicle with seatbelt fastened until shaking stops\n- Proceed cautiously after the earthquake has stopped"
+    },
+    {
+      "title": "After an Earthquake",
+      "content": "## Immediate Actions\n\n- Check yourself and others for injuries\n- Inspect your home for damage\n- Look for and extinguish small fires\n- Clean up spilled medications, bleach, gasoline, or other flammable liquids\n- Listen to a battery-operated radio for emergency information\n\n## Safety Precautions\n\n- Expect aftershocks\n- Stay away from damaged buildings\n- Be careful around broken glass and debris\n- Wear sturdy shoes in areas covered with fallen debris and broken glass\n- Be careful of chimneys (they may fall during aftershocks)\n- Stay away from beaches (tsunami risk)\n\n## When to Evacuate\n\n- If your home is unsafe\n- If authorities advise evacuation\n- If you're in a tsunami zone after a coastal earthquake"
+    }
+  ],
+  "resources": [
+    {
+      "title": "FEMA Earthquake Safety",
+      "url": "https://www.ready.gov/earthquakes"
+    },
+    {
+      "title": "USGS Earthquake Hazards Program",
+      "url": "https://www.usgs.gov/programs/earthquake-hazards-program"
+    },
+    {
+      "title": "Red Cross Earthquake Preparedness",
+      "url": "https://www.redcross.org/get-help/how-to-prepare-for-emergencies/types-of-emergencies/earthquake.html"
+    }
+  ]
+} 

@@ -1,0 +1,32 @@
+{
+  "title": "Hurricane Preparedness: Before, During & After",
+  "description": "Essential information to help you prepare for, survive during, and recover after a hurricane.",
+  "sections": [
+    {
+      "title": "Before a Hurricane",
+      "content": "## Know Your Risk\n\n- Know if you live in an evacuation area\n- Assess your home for vulnerability to storm surge, flooding, and wind\n- Research your community's hurricane response plan\n\n## Make a Plan\n\n- Determine where to evacuate if needed\n- Create a family communication plan\n- Plan for pets and livestock\n- Have a backup plan for medical needs or disabilities\n\n## Prepare Your Home\n\n- Clear gutters and storm drains\n- Trim trees and shrubs\n- Reinforce garage doors\n- Secure or bring in outdoor furniture\n- Consider installing hurricane shutters or boarding up windows\n- Review insurance policies\n\n## Build a Kit\n\n- Water (1 gallon per person per day for at least 3 days)\n- Non-perishable food (at least 3-day supply)\n- Medications and medical supplies\n- First aid kit\n- Battery-powered or hand-crank radio\n- Flashlights and extra batteries\n- Cash and important documents in waterproof container\n- Full tank of gas in vehicles"
+    },
+    {
+      "title": "During a Hurricane",
+      "content": "## If Evacuating\n\n- Leave early to avoid traffic and deteriorating weather\n- Follow designated evacuation routes\n- Take only essential items\n- Lock your home\n- Notify friends and family of your route and destination\n\n## If Staying Home (Sheltering in Place)\n\n- Stay indoors and away from windows and glass doors\n- Close all interior doors and secure exterior doors\n- Keep curtains and blinds closed\n- Take refuge in a small interior room, closet, or hallway on the lowest level\n- Lie on the floor under a table or other sturdy object if the building experiences severe winds\n- Do not be fooled by a lull in the storm – it could be the eye of the hurricane and winds will pick up again"
+    },
+    {
+      "title": "After a Hurricane",
+      "content": "## Safety First\n\n- Watch for downed power lines and report them immediately\n- Stay out of floodwater – it may be contaminated or electrically charged\n- Use a generator safely – never use indoors, including in garages or carports\n- Beware of dangerous debris, damaged structures, and wildlife displaced by the storm\n\n## Returning Home\n\n- Do not return until authorities say it is safe\n- Look for external damage before entering\n- If you smell gas, leave immediately and call 9-1-1\n- Document damage with photos for insurance claims\n- Clean and disinfect everything that got wet\n- Throw away food that may have been contaminated\n\n## Recovery Resources\n\n- Register with FEMA for disaster assistance if your area receives a disaster declaration\n- Contact your insurance company promptly\n- Be wary of contractor fraud – verify credentials before hiring"
+    }
+  ],
+  "resources": [
+    {
+      "title": "National Hurricane Center",
+      "url": "https://www.nhc.noaa.gov/"
+    },
+    {
+      "title": "FEMA Hurricane Preparedness",
+      "url": "https://www.ready.gov/hurricanes"
+    },
+    {
+      "title": "Red Cross Hurricane Safety",
+      "url": "https://www.redcross.org/get-help/how-to-prepare-for-emergencies/types-of-emergencies/hurricane.html"
+    }
+  ]
+} 

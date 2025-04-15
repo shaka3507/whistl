@@ -1,0 +1,32 @@
+{
+  "title": "Tornado Safety: Your Quick-Action Guide",
+  "description": "Learn how to stay safe before, during, and after a tornado strikes.",
+  "sections": [
+    {
+      "title": "Before a Tornado",
+      "content": "## Know the Signs\n\n- Dark, often greenish sky\n- Large hail\n- A large, dark, low-lying cloud (particularly if rotating)\n- A loud roar, similar to a freight train\n\n## Prepare Your Home\n\n- Identify the safest room in your home (typically a basement, storm cellar, or interior room on the lowest floor with no windows)\n- Make sure everyone in your household knows where to go during a tornado warning\n- Remove dead or rotted trees that could fall on your home\n- Secure outdoor objects that could blow away\n- Have a NOAA Weather Radio with a warning alarm tone\n\n## Create an Emergency Kit\n\n- Water (one gallon per person per day for at least three days)\n- Food (at least a three-day supply of non-perishable food)\n- Battery-powered or hand-crank radio and a NOAA Weather Radio with tone alert\n- Flashlight and extra batteries\n- First aid kit\n- Whistle to signal for help\n- Dust mask, plastic sheeting, and duct tape\n- Moist towelettes, garbage bags, and plastic ties\n- Wrench or pliers to turn off utilities\n- Manual can opener\n- Local maps\n- Cell phone with chargers and a backup battery"
+    },
+    {
+      "title": "During a Tornado",
+      "content": "## If You're Inside\n\n- Go to your pre-designated safe room (basement, storm cellar, or interior room on the lowest floor)\n- Stay away from windows, doors, and outside walls\n- Get under a sturdy piece of furniture and use your arms to protect your head and neck\n- Do not open windows (it doesn't equalize pressure; it just lets in damaging winds)\n\n## If You're in a Mobile Home\n\n- Get out immediately and go to the lowest floor of a nearby building or a storm shelter\n- Mobile homes, even if tied down, offer little protection from tornadoes\n\n## If You're Outside\n\n- Seek shelter in a basement, shelter, or sturdy building\n- If you can't quickly walk to a shelter, immediately get into a vehicle and try to drive to the closest sturdy shelter\n- If flying debris occurs while you are driving, pull over and park\n- Stay in the car with the seat belt on, put your head down below the windows, and cover your head with your hands and a blanket if possible\n- If you can safely get noticeably lower than the level of the roadway, exit your car and lie in that area, covering your head with your hands\n\n## If You're in a School, Nursing Home, Hospital, Factory, or Shopping Center\n\n- Go to the predetermined shelter area (interior hallway on the lowest floor, away from windows)\n- Avoid places with wide-span roofs such as auditoriums, cafeterias, and large hallways\n\n## If You're in a High-Rise Building\n\n- Go to a small interior room or hallway on the lowest floor possible"
+    },
+    {
+      "title": "After a Tornado",
+      "content": "## Immediate Actions\n\n- Check for injuries and provide first aid if you are trained\n- Check on nearby neighbors, especially the elderly, disabled, or those with children\n- Look out for broken glass, nails, and other sharp objects\n- Stay away from damaged areas unless your assistance has been specifically requested by police, fire, or relief organizations\n- Watch out for fallen power lines and report them to the utility company\n- Stay out of damaged buildings\n\n## Cleanup Safety\n\n- Wear sturdy boots or shoes, long sleeves, and gloves\n- Be aware of hazards from exposed nails and broken glass\n- Do not touch electrical equipment if you are wet or standing in water\n- Never use a generator indoors, in garages, or near windows and doors\n- Use a battery-powered flashlight for inspecting a damaged home\n- Clean up spilled medicines, bleaches, gasoline, and other flammable liquids immediately\n\n## Communication\n\n- Use your phone only for emergency calls\n- Monitor weather reports for updated information\n- Listen to emergency officials for information and instructions"
+    }
+  ],
+  "resources": [
+    {
+      "title": "NOAA National Weather Service Tornado Safety",
+      "url": "https://www.weather.gov/safety/tornado"
+    },
+    {
+      "title": "FEMA Tornado Information",
+      "url": "https://www.ready.gov/tornadoes"
+    },
+    {
+      "title": "Red Cross Tornado Safety",
+      "url": "https://www.redcross.org/get-help/how-to-prepare-for-emergencies/types-of-emergencies/tornado.html"
+    }
+  ]
+} 
