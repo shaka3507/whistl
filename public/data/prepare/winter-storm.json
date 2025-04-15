@@ -1,0 +1,28 @@
+{
+  "title": "Winter Storm Survival: Beat the Freeze",
+  "description": "Learn about winter storm survival: beat the freeze. This is a placeholder description.",
+  "sections": [
+    {
+      "title": "Before",
+      "content": "## Preparation\n\nThis is placeholder content. You should replace this with real content about preparation steps.\n\n- Step 1\n- Step 2\n- Step 3"
+    },
+    {
+      "title": "During",
+      "content": "## Immediate Actions\n\nThis is placeholder content. You should replace this with real content about what to do during this event.\n\n- Action 1\n- Action 2\n- Action 3"
+    },
+    {
+      "title": "After",
+      "content": "## Recovery\n\nThis is placeholder content. You should replace this with real content about recovery steps.\n\n- Recovery step 1\n- Recovery step 2\n- Recovery step 3"
+    }
+  ],
+  "resources": [
+    {
+      "title": "FEMA Website",
+      "url": "https://www.ready.gov/"
+    },
+    {
+      "title": "Red Cross Resources",
+      "url": "https://www.redcross.org/"
+    }
+  ]
+}
