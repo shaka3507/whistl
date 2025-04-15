@@ -1,5 +1,33 @@
 {
   "title": "Emergency Kit Essentials: Your Lifeline in Crisis",
+  "is_module": true,
+  "questions": [
+    {
+      "question": "What is the most important item to include in an emergency kit?",
+      "options": ["Water", "Food", "First aid kit", "Flashlight"],
+      "answer": "Water"
+    },
+    {
+      "question": "How much water should be stored per person per day in an emergency kit?",
+      "options": ["1 gallon", "2 liters", "3 gallons", "5 liters"],
+      "answer": "1 gallon"
+    },
+    {
+      "question": "Which item is essential for communication during an emergency?",
+      "options": ["Radio", "Cell phone", "Walkie-talkie", "Satellite phone"],
+      "answer": "Radio"
+    },
+    {
+      "question": "What type of food is recommended for an emergency kit?",
+      "options": ["Canned food", "Fresh produce", "Frozen meals", "Takeout"],
+      "answer": "Canned food"
+    },
+    {
+      "question": "What is a crucial tool to include in an emergency kit for signaling?",
+      "options": ["Whistle", "Mirror", "Flare", "All of the above"],
+      "answer": "All of the above"
+    }
+  ],
   "description": "A well-stocked emergency kit is crucial for survival when disaster strikes. Learn what supplies to gather, how to maintain your kit, and where to store emergency supplies to be prepared for any situation.",
   "sections": [
     {

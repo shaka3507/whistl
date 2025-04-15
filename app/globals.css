@@ -12,6 +12,14 @@ body {
   }
 }
 
+/* Tailwind or globals.css */
+.quiz-dialog .answer-button {
+  @apply text-black rounded-full px-4 py-2 text-sm font-semibold;
+}
+.quiz-dialog .answer-button-selected {
+  @apply bg-yellow-300 text-black;
+}
+
 @layer base {
   :root {
     --background: 0 0% 100%;

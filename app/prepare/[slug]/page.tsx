@@ -1,90 +1,193 @@
-"use client"
+"use client";
 
-import { useEffect, useState, useRef, useMemo } from "react"
-import { useParams } from "next/navigation"
-import { Header } from "@/components/header"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
-import { FloatingChatButton } from "@/components/floating-chat-button"
-import ReactMarkdown from "react-markdown"
-import { ArrowLeftCircle, AlertTriangle, BookOpen, ExternalLink, ChevronDown, Search } from "lucide-react"
-import Link from "next/link"
-import { cn } from "@/lib/utils"
-import { Input } from "@/components/ui/input"
+import { useEffect, useState, useRef, useMemo } from "react";
+import { useParams } from "next/navigation";
+import { Header } from "@/components/header";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { FloatingChatButton } from "@/components/floating-chat-button";
+import ReactMarkdown from "react-markdown";
+import {
+  ArrowLeftCircle,
+  AlertTriangle,
+  BookOpen,
+  ExternalLink,
+  ChevronDown,
+  Search,
+} from "lucide-react";
+import Link from "next/link";
+import { cn } from "@/lib/utils";
+import { Input } from "@/components/ui/input";
+import {
+  Dialog,
+  DialogTrigger,
+  DialogContent,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 // Define the type for the JSON data structure
 interface PrepareData {
-  title: string
-  description: string
+  title: string;
+  description: string;
+  is_module?: boolean;
   sections: {
-    title: string
-    content: string
-  }[]
+    title: string;
+    content: string;
+  }[];
   resources: {
-    title: string
-    url: string
-  }[]
+    title: string;
+    url: string;
+  }[];
+  questions?: {
+    question: string;
+    options: string[];
+    answer: string;
+    image?: string;
+  }[];
 }
 
+const VisuallyHidden = ({ children }: { children: React.ReactNode }) => (
+  <span
+    style={{
+      border: 0,
+      clip: "rect(0 0 0 0)",
+      height: "1px",
+      margin: "-1px",
+      overflow: "hidden",
+      padding: 0,
+      position: "absolute",
+      width: "1px",
+      whiteSpace: "nowrap",
+    }}
+  >
+    {children}
+  </span>
+);
+
 export default function PreparePage() {
-  const { slug } = useParams()
-  const [data, setData] = useState<PrepareData | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [scrollProgress, setScrollProgress] = useState(0)
-  const [searchTerm, setSearchTerm] = useState("")
-  const contentRef = useRef<HTMLDivElement>(null)
+  const { slug } = useParams();
+  const [data, setData] = useState<PrepareData | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [scrollProgress, setScrollProgress] = useState(0);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [isQuizOpen, setIsQuizOpen] = useState(false);
+  const [quizQuestions, setQuizQuestions] = useState<
+    PrepareData["questions"] | null
+  >(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const quizRef = useRef<HTMLDivElement>(null);
+
+  const [currentQuestion, setCurrentQuestion] = useState(0)
+const [selectedOptions, setSelectedOptions] = useState<{ [key: number]: string }>({})
+
+const handleOptionSelect = (option: string) => {
+  setSelectedOptions({ ...selectedOptions, [currentQuestion]: option })
+}
+
+const goToNext = async () => {
+  if (currentQuestion < (quizQuestions?.length || 1) - 1) {
+    setCurrentQuestion(currentQuestion + 1);
+  } else {
+    // Evaluate answers
+    const correctAnswers = quizQuestions?.filter((q, index) => q.answer === selectedOptions[index]).length || 0;
+    const totalQuestions = quizQuestions?.length || 1;
+    const percentageCorrect = (correctAnswers / totalQuestions) * 100;
+
+    // Display report
+    alert(`You got ${correctAnswers} out of ${totalQuestions} questions correct (${percentageCorrect.toFixed(2)}%)`);
+
+    // Send progress to backend
+    try {
+      const response = await fetch('/api/module_progress', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          slug,
+          correctAnswers,
+          totalQuestions,
+          percentageCorrect,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to save progress');
+      }
+
+      console.log('Progress saved successfully');
+    } catch (error) {
+      console.error('Error saving progress:', error);
+    }
+  }
+};
+
+const goToPrevious = () => {
+  if (currentQuestion > 0) {
+    setCurrentQuestion(currentQuestion - 1)
+  }
+}
 
   // Handle scroll to update text color
   useEffect(() => {
     const handleScroll = () => {
-      if (!contentRef.current) return
+      if (!contentRef.current) return;
 
-      const windowHeight = window.innerHeight
-      const documentHeight = document.documentElement.scrollHeight
-      const scrollTop = window.scrollY
-      
+      const windowHeight = window.innerHeight;
+      const documentHeight = document.documentElement.scrollHeight;
+      const scrollTop = window.scrollY;
+
       // Calculate scroll progress (0 to 1)
-      const progress = Math.min(scrollTop / (documentHeight - windowHeight), 1)
-      setScrollProgress(progress)
-    }
+      const progress = Math.min(scrollTop / (documentHeight - windowHeight), 1);
+      setScrollProgress(progress);
+    };
 
     // Initial calculation
-    handleScroll()
+    handleScroll();
 
-    window.addEventListener('scroll', handleScroll)
+    window.addEventListener("scroll", handleScroll);
     return () => {
-      window.removeEventListener('scroll', handleScroll)
-    }
-  }, [])
+      window.removeEventListener("scroll", handleScroll);
+    };
+  }, []);
 
   useEffect(() => {
     async function fetchData() {
-      setIsLoading(true)
+      setIsLoading(true);
       try {
         // Attempt to fetch data from the public JSON file based on slug
-        const response = await fetch(`/data/prepare/${slug}.json`)
-        
+        const response = await fetch(`/data/prepare/${slug}.json`);
+
         if (!response.ok) {
-          throw new Error(`Failed to load data for ${slug}`)
+          throw new Error(`Failed to load data for ${slug}`);
         }
-        
-        const jsonData = await response.json()
-        setData(jsonData)
-        setError(null)
+
+        const jsonData = await response.json();
+        setData(jsonData);
+        setQuizQuestions(jsonData.questions);
+        setError(null);
       } catch (err) {
-        console.error(`Error loading prepare data for ${slug}:`, err)
-        setError(`Unable to load information for "${slug}". Please try another topic.`)
-        setData(null)
+        console.error(`Error loading prepare data for ${slug}:`, err);
+        setError(
+          `Unable to load information for "${slug}". Please try another topic.`
+        );
+        setData(null);
       } finally {
-        setIsLoading(false)
+        setIsLoading(false);
       }
     }
 
     if (slug) {
-      fetchData()
+      fetchData();
     }
-  }, [slug])
+  }, [slug]);
+
+  const scrollToQuiz = () => {
+    if (quizRef.current) {
+      quizRef.current.scrollIntoView({ behavior: "smooth" });
+    }
+  };
 
   // Determine dark mode class based on scroll progress - always true in dark theme
   const isDarkMode = true;
@@ -92,33 +195,48 @@ export default function PreparePage() {
   // Calculate text color styles based on scroll progress
   const getTextColorStyle = (baseProgress = 0) => {
     // Adjust progress to create a staggered effect for different sections
-    const adjustedProgress = Math.max(0, Math.min(1, scrollProgress * 1.5 - baseProgress))
-    
+    const adjustedProgress = Math.max(
+      0,
+      Math.min(1, scrollProgress * 1.5 - baseProgress)
+    );
+
     // Interpolate between light grey and pure white text
-    const startColor = [220, 220, 220]  // RGB for light grey text
-    const endColor = [255, 255, 255]    // RGB for white text
-    
-    const r = Math.round(startColor[0] + (endColor[0] - startColor[0]) * adjustedProgress)
-    const g = Math.round(startColor[1] + (endColor[1] - startColor[1]) * adjustedProgress)
-    const b = Math.round(startColor[2] + (endColor[2] - startColor[2]) * adjustedProgress)
-    
+    const startColor = [220, 220, 220]; // RGB for light grey text
+    const endColor = [255, 255, 255]; // RGB for white text
+
+    const r = Math.round(
+      startColor[0] + (endColor[0] - startColor[0]) * adjustedProgress
+    );
+    const g = Math.round(
+      startColor[1] + (endColor[1] - startColor[1]) * adjustedProgress
+    );
+    const b = Math.round(
+      startColor[2] + (endColor[2] - startColor[2]) * adjustedProgress
+    );
+
     return {
       color: `rgb(${r}, ${g}, ${b})`,
-      transition: 'color 0.3s ease-out',
-    }
-  }
+      transition: "color 0.3s ease-out",
+    };
+  };
 
   // Get background style based on scroll progress
   const getBackgroundStyle = () => {
     // Create a gradient that stays black and gradually introduces very subtle color
-    const black = [0, 0, 0]         // RGB for pure black (starting color)
-    const darkCharcoal = [15, 15, 15]  // RGB for very dark charcoal (ending color)
-    
+    const black = [0, 0, 0]; // RGB for pure black (starting color)
+    const darkCharcoal = [15, 15, 15]; // RGB for very dark charcoal (ending color)
+
     // Calculate interpolated color based on scroll progress
-    const r = Math.round(black[0] + (darkCharcoal[0] - black[0]) * scrollProgress)
-    const g = Math.round(black[1] + (darkCharcoal[1] - black[1]) * scrollProgress)
-    const b = Math.round(black[2] + (darkCharcoal[2] - black[2]) * scrollProgress)
-    
+    const r = Math.round(
+      black[0] + (darkCharcoal[0] - black[0]) * scrollProgress
+    );
+    const g = Math.round(
+      black[1] + (darkCharcoal[1] - black[1]) * scrollProgress
+    );
+    const b = Math.round(
+      black[2] + (darkCharcoal[2] - black[2]) * scrollProgress
+    );
+
     // Create subtle gradient effect
     const gradient = `linear-gradient(to bottom, 
             rgb(${black[0]}, ${black[1]}, ${black[2]}) 0%, 
@@ -126,19 +244,22 @@ export default function PreparePage() {
 
     return {
       background: gradient,
-      transition: 'background 0.5s ease-out',
+      transition: "background 0.5s ease-out",
     };
   };
 
   // Enhanced fade in style that requires scrolling to see elements
   const getFadeStyle = (startPoint = 0.1, endPoint = 0.3) => {
     // Element becomes visible only after startPoint and reaches full opacity at endPoint
-    const fadeIn = Math.min(1, Math.max(0, (scrollProgress - startPoint) / (endPoint - startPoint)));
-    
+    const fadeIn = Math.min(
+      1,
+      Math.max(0, (scrollProgress - startPoint) / (endPoint - startPoint))
+    );
+
     return {
       opacity: fadeIn,
       transform: `translateY(${(1 - fadeIn) * 25}px)`,
-      transition: 'opacity 0.5s ease-out, transform 0.5s ease-out',
+      transition: "opacity 0.5s ease-out, transform 0.5s ease-out",
     };
   };
 
@@ -147,18 +268,30 @@ export default function PreparePage() {
     if (!data || !searchTerm.trim()) {
       return data?.sections || [];
     }
-    
+
     const lowerCaseSearch = searchTerm.toLowerCase();
-    
-    return (data.sections || []).filter(section => 
-      section.title.toLowerCase().includes(lowerCaseSearch) ||
-      section.content.toLowerCase().includes(lowerCaseSearch)
+
+    return (data.sections || []).filter(
+      (section) =>
+        section.title.toLowerCase().includes(lowerCaseSearch) ||
+        section.content.toLowerCase().includes(lowerCaseSearch)
     );
   }, [data, searchTerm]);
 
   // Check if any sections are filtered out
-  const hasFilteredResults = searchTerm.trim() !== "" && data?.sections && 
-    filteredSections.length > 0 && filteredSections.length < data.sections.length;
+  const hasFilteredResults =
+    searchTerm.trim() !== "" &&
+    data?.sections &&
+    filteredSections.length > 0 &&
+    filteredSections.length < data.sections.length;
+
+  const openQuiz = () => {
+    if (data?.questions) {
+      setQuizQuestions(data.questions);
+    }
+    setIsQuizOpen(true);
+    console.log("Quiz Opened:", isQuizOpen);
+  };
 
   // Loading state with black theme
   if (isLoading) {
@@ -172,7 +305,7 @@ export default function PreparePage() {
           </div>
         </div>
       </div>
-    )
+    );
   }
 
   // Error state with black theme
@@ -184,44 +317,53 @@ export default function PreparePage() {
           <div className="bg-red-950 border border-red-800 rounded-lg p-6 flex items-start text-red-100">
             <AlertTriangle className="text-red-400 mr-4 mt-1 flex-shrink-0" />
             <div>
-              <h1 className="text-2xl font-bold text-red-300 mb-2">Content Not Found</h1>
+              <h1 className="text-2xl font-bold text-red-300 mb-2">
+                Content Not Found
+              </h1>
               <p className="text-red-100 mb-4">{error}</p>
               <Link href="/prepare">
-                <Button variant="outline" className="border-red-500 text-red-300 hover:bg-red-950">Return to Prepare Library</Button>
+                <Button
+                  variant="outline"
+                  className="border-red-500 text-red-300 hover:bg-red-950"
+                >
+                  Return to Prepare Library
+                </Button>
               </Link>
             </div>
           </div>
         </div>
       </div>
-    )
+    );
   }
 
   // If we have data, display the content with dark theme
   return (
-    <div 
-      style={getBackgroundStyle()} 
+    <div
+      style={getBackgroundStyle()}
       className="min-h-screen prepare-transition overflow-x-hidden prepare-content prepare-dark-mode"
     >
       {/* Background glow effects */}
-      <div 
-        className="prepare-dark-glow fixed top-[20%] left-[10%]" 
-        style={{ 
+      <div
+        className="prepare-dark-glow fixed top-[20%] left-[10%]"
+        style={{
           opacity: Math.max(0, scrollProgress * 0.08 - 0.02),
           transform: `scale(${1 + scrollProgress * 0.5})`,
-          transition: 'transform 0.5s ease-out, opacity 0.5s ease-out',
-          background: 'radial-gradient(circle, rgba(255, 255, 255, 0.07), rgba(120, 120, 120, 0.03))'
+          transition: "transform 0.5s ease-out, opacity 0.5s ease-out",
+          background:
+            "radial-gradient(circle, rgba(255, 255, 255, 0.07), rgba(120, 120, 120, 0.03))",
         }}
       />
-      <div 
-        className="prepare-dark-glow fixed bottom-[30%] right-[15%]" 
-        style={{ 
+      <div
+        className="prepare-dark-glow fixed bottom-[30%] right-[15%]"
+        style={{
           opacity: Math.max(0, scrollProgress * 0.09 - 0.02),
           transform: `scale(${0.8 + scrollProgress * 0.6})`,
-          transition: 'transform 0.5s ease-out, opacity 0.5s ease-out',
-          background: 'radial-gradient(circle, rgba(200, 200, 200, 0.06), rgba(70, 70, 70, 0.02))'
+          transition: "transform 0.5s ease-out, opacity 0.5s ease-out",
+          background:
+            "radial-gradient(circle, rgba(200, 200, 200, 0.06), rgba(70, 70, 70, 0.02))",
         }}
       />
-      
+
       <Header />
       <div className="container py-8" ref={contentRef}>
         {data && (
@@ -233,62 +375,73 @@ export default function PreparePage() {
                 </Link>
               </div>
 
-              <h1 
-                className="text-4xl md:text-5xl font-bold mb-2 prepare-animate-title text-gray-100" 
+              <h1
+                className="text-4xl md:text-5xl font-bold mb-2 prepare-animate-title text-gray-100"
                 style={{
                   ...getTextColorStyle(),
                   opacity: Math.min(1, scrollProgress * 4 + 0.2),
-                  transform: `translateY(${Math.max(0, (1 - scrollProgress * 3) * 30)}px)`,
+                  transform: `translateY(${Math.max(
+                    0,
+                    (1 - scrollProgress * 3) * 30
+                  )}px)`,
                 }}
               >
-                {data.title.includes(':') ? data.title.split(':')[0] : data.title}
+                {data.title.includes(":")
+                  ? data.title.split(":")[0]
+                  : data.title}
               </h1>
-              
-              {data.title.includes(':') && (
-                <p 
-                  className="text-2xl md:text-3xl font-medium mb-6 prepare-animate-title text-gray-300" 
+
+              {data.title.includes(":") && (
+                <p
+                  className="text-2xl md:text-3xl font-medium mb-6 prepare-animate-title text-gray-300"
                   style={{
                     ...getTextColorStyle(0.05),
                     opacity: Math.min(1, scrollProgress * 4 + 0.1),
-                    transform: `translateY(${Math.max(0, (1 - scrollProgress * 3) * 30)}px)`,
+                    transform: `translateY(${Math.max(
+                      0,
+                      (1 - scrollProgress * 3) * 30
+                    )}px)`,
                   }}
                 >
-                  {data.title.split(':')[1].trim()}
+                  {data.title.split(":")[1].trim()}
                 </p>
               )}
-              
-              <p 
-                className="text-lg mb-8 prepare-animate-description text-gray-300" 
+
+              <p
+                className="text-lg mb-8 prepare-animate-description text-gray-300"
                 style={{
                   ...getTextColorStyle(),
                   opacity: Math.min(1, scrollProgress * 4),
-                  transform: `translateY(${Math.max(0, (1 - scrollProgress * 3) * 30)}px)`,
+                  transform: `translateY(${Math.max(
+                    0,
+                    (1 - scrollProgress * 3) * 30
+                  )}px)`,
                 }}
               >
                 {data.description}
               </p>
-              
+
               {/* Scroll indicator */}
-              <div 
+              <div
                 className="hidden md:flex flex-col items-center absolute -bottom-16 left-1/2 transform -translate-x-1/2"
                 style={{
                   ...getTextColorStyle(),
-                  opacity: Math.max(0, 0.8 - scrollProgress * 2)
+                  opacity: Math.max(0, 0.8 - scrollProgress * 2),
                 }}
               >
                 <span className="text-sm mb-2">Scroll to explore</span>
                 <ChevronDown className="h-5 w-5 animate-bounce" />
               </div>
-              
+
               {/* Adjusted decorative elements for dark theme */}
-              <div 
+              <div
                 className="absolute top-40 right-10 w-40 h-40 rounded-full blur-[80px] bg-gray-300/5 -z-10"
                 style={{
                   ...getFadeStyle(0.1, 0.3),
                   opacity: 0.1 + scrollProgress * 0.2,
                 }}
               />
-              <div 
+              <div
                 className="absolute top-80 left-20 w-60 h-60 rounded-full blur-[100px] bg-gray-400/5 -z-10"
                 style={{
                   ...getFadeStyle(0.2, 0.4),
@@ -298,11 +451,13 @@ export default function PreparePage() {
             </div>
 
             {/* Sticky search bar */}
-            <div className="sticky top-5 z-50 mb-8 max-w-3xl mx-auto transition-all duration-300"
-                style={{
-                  opacity: Math.min(1, scrollProgress * 5 + 0.2),
-                  transform: scrollProgress > 0.05 ? 'translateY(0)' : 'translateY(-100%)',
-                }}
+            <div
+              className="sticky top-5 z-50 mb-8 max-w-3xl mx-auto transition-all duration-300"
+              style={{
+                opacity: Math.min(1, scrollProgress * 5 + 0.2),
+                transform:
+                  scrollProgress > 0.05 ? "translateY(0)" : "translateY(-100%)",
+              }}
             >
               <div className="relative w-full">
                 <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
@@ -338,17 +493,25 @@ export default function PreparePage() {
                 <div className="sticky top-20">
                   <Card className="bg-black/30 border-gray-800/30 backdrop-filter backdrop-blur-sm border transition-all duration-300 shadow-xl">
                     <CardContent className="p-6">
-                      <h2 
+                      <h2
                         className="text-xl font-semibold mb-4 flex items-center justify-between"
                         style={getTextColorStyle()}
                       >
                         <div className="flex items-center">
-                          <BookOpen 
-                            className="mr-2 h-5 w-5" 
+                          <BookOpen
+                            className="mr-2 h-5 w-5"
                             style={getTextColorStyle()}
                           />
                           <span>Contents</span>
                         </div>
+                        <p>
+                          {" "}
+                          {data.is_module && (
+                            <Button onClick={() => scrollToQuiz()}>
+                              skip to quiz
+                            </Button>
+                          )}
+                        </p>
                         {searchTerm.trim() !== "" && (
                           <span className="text-sm text-gray-400">
                             {filteredSections.length} of {data.sections.length}
@@ -358,15 +521,21 @@ export default function PreparePage() {
                       <nav className="space-y-1">
                         {data.sections.map((section, index) => {
                           // Check if this section is in our filtered results
-                          const isVisible = !searchTerm.trim() || filteredSections.some(s => s.title === section.title);
-                          
+                          const isVisible =
+                            !searchTerm.trim() ||
+                            filteredSections.some(
+                              (s) => s.title === section.title
+                            );
+
                           return (
-                            <a 
+                            <a
                               key={index}
                               href={`#section-${index}`}
                               className={cn(
                                 "block p-2 rounded-md transition-colors hover:bg-gray-900/50",
-                                searchTerm.trim() !== "" && !isVisible && "opacity-40 line-through"
+                                searchTerm.trim() !== "" &&
+                                  !isVisible &&
+                                  "opacity-40 line-through"
                               )}
                               style={getTextColorStyle(index * 0.1)}
                               onClick={() => {
@@ -390,10 +559,14 @@ export default function PreparePage() {
               <div className="lg:col-span-2 space-y-12">
                 {searchTerm.trim() !== "" && filteredSections.length === 0 ? (
                   <div className="bg-black/30 border border-gray-800/50 rounded-lg p-8 text-center">
-                    <h3 className="text-xl text-gray-300 mb-2">No sections found matching "{searchTerm}"</h3>
-                    <p className="text-gray-400">Try a different search term or clear your search</p>
-                    <Button 
-                      variant="outline" 
+                    <h3 className="text-xl text-gray-300 mb-2">
+                      No sections found matching "{searchTerm}"
+                    </h3>
+                    <p className="text-gray-400">
+                      Try a different search term or clear your search
+                    </p>
+                    <Button
+                      variant="outline"
                       className="mt-4 border-gray-700 text-gray-300"
                       onClick={() => setSearchTerm("")}
                     >
@@ -404,15 +577,20 @@ export default function PreparePage() {
                   <>
                     {filteredSections.map((section, originalIndex) => {
                       // Find the original index in the unfiltered array for correct ID anchors
-                      const index = data.sections.findIndex(s => s.title === section.title);
+                      const index = data.sections.findIndex(
+                        (s) => s.title === section.title
+                      );
                       return (
-                        <div 
-                          key={index} 
-                          id={`section-${index}`} 
+                        <div
+                          key={index}
+                          id={`section-${index}`}
                           className="scroll-mt-20"
-                          style={getFadeStyle(0.1 + index * 0.1, 0.25 + index * 0.1)}
+                          style={getFadeStyle(
+                            0.1 + index * 0.1,
+                            0.25 + index * 0.1
+                          )}
                         >
-                          <h2 
+                          <h2
                             className="text-2xl font-bold mb-4"
                             style={getTextColorStyle(index * 0.1)} // Staggered effect
                           >
@@ -420,7 +598,9 @@ export default function PreparePage() {
                           </h2>
                           <Card className="bg-black/40 border-gray-800/30 backdrop-filter backdrop-blur-sm border transition-all duration-300">
                             <CardContent className="p-6 prose prose-invert max-w-none">
-                              <div style={getTextColorStyle(index * 0.1 + 0.05)}>
+                              <div
+                                style={getTextColorStyle(index * 0.1 + 0.05)}
+                              >
                                 <ReactMarkdown>{section.content}</ReactMarkdown>
                               </div>
                             </CardContent>
@@ -434,7 +614,7 @@ export default function PreparePage() {
                 {/* Resources section */}
                 {data.resources && data.resources.length > 0 && (
                   <div className="mt-16" style={getFadeStyle(0.7, 0.9)}>
-                    <h2 
+                    <h2
                       className="text-2xl font-bold mb-4"
                       style={getTextColorStyle(0.8)} // Later effect
                     >
@@ -462,14 +642,119 @@ export default function PreparePage() {
                     </Card>
                   </div>
                 )}
+
+                {/* Quiz Section */}
+                {data.is_module && data.questions && (
+                  <div
+                    className="mt-16 p-8"
+                    style={getFadeStyle(0.7, 0.9)}
+                    ref={quizRef}
+                  >
+                    <Dialog>
+                      <DialogTrigger asChild>
+                        <Button
+                          onClick={scrollToQuiz}
+                          className="bg-primary text-primary-foreground hover:bg-primary/90"
+                        >
+                          Take Quiz
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent 
+                        className="w-screen max-w-full h-screen md:max-w-3xl md:h-auto m-0 p-0 text-white rounded-none md:rounded-2xl flex flex-col"
+                      >
+                        <div className="p-6">
+                          {/* Top bar */}
+                          <div className="flex justify-between items-center text-sm font-medium mb-6">
+                            <button
+                              className="text-white opacity-70 hover:opacity-100"
+                              onClick={() => setIsQuizOpen(false)}
+                            >
+                              Close
+                            </button>
+                          </div>
+
+                          {/* Progress bar */}
+                          <div className="flex justify-center gap-2 mb-6">
+                            {[...Array(quizQuestions?.length || 4)].map((_, index) => (
+                              <div
+                                key={index}
+                                className={`w-6 h-2 rounded-full ${
+                                  index < currentQuestion
+                                    ? "bg-white"
+                                    : "bg-white/30"
+                                }`}
+                              ></div>
+                            ))}
+                          </div>
+
+
+                          {/* Question content */}
+                          <div className="mb-6">
+                            {quizQuestions?.[currentQuestion]?.image && <img
+                              src="/placeholder-image.svg"
+                              alt="Illustration"
+                              className="w-24 h-24 mx-auto mb-4"
+                            />}
+                            <p className="text-xl font-bold text-center">
+                              {quizQuestions?.[currentQuestion]?.question}
+                            </p>
+                          </div>
+
+                          {/* Answer options */}
+                          <div className="grid grid-cols-2 gap-4 mb-6">
+                            {quizQuestions?.[currentQuestion]?.options.map(
+                              (option, i) => {
+                                const letter = String.fromCharCode(65 + i); // A, B, C, D
+                                const isSelected =
+                                  selectedOptions[currentQuestion] === option;
+
+                                return (
+                                  <button
+                                    key={i}
+                                    onClick={() => handleOptionSelect(option)}
+                                    className={`flex items-center justify-center px-4 py-3 rounded-full font-semibold transition-all ${
+                                      isSelected
+                                        ? "bg-yellow-400 text-black"
+                                        : "bg-white text-black"
+                                    }`}
+                                  >
+                                    <span className="mr-2">{letter}.</span>{" "}
+                                    {option}
+                                  </button>
+                                );
+                              }
+                            )}
+                          </div>
+
+                          {/* Navigation Buttons */}
+                          <div className="flex justify-between items-center">
+                            <button
+                              onClick={goToPrevious}
+                              className="bg-white/20 text-white rounded-full px-5 py-2"
+                              disabled={currentQuestion === 0}
+                            >
+                              ← Previous
+                            </button>
+                            <button
+                              onClick={goToNext}
+                              className="bg-white text-purple-800 rounded-full px-5 py-2 font-semibold"
+                            >
+                              Next →
+                            </button>
+                          </div>
+                        </div>
+                      </DialogContent>
+                    </Dialog>
+                  </div>
+                )}
               </div>
             </div>
           </>
         )}
       </div>
-      
+
       {/* Mobile Floating Chat Button */}
       <FloatingChatButton />
     </div>
-  )
-} 
+  );
+}
