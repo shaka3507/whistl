@@ -90,7 +90,14 @@ export default function PreparePage() {
                       >
                         <Card className="h-full transition-all hover:shadow-md">
                           <CardContent className="p-6">
-                            <CardTitle className="text-xl mb-2">{card.title}</CardTitle>
+                            {card.title.includes(':') ? (
+                              <>
+                                <CardTitle className="text-xl mb-1">{card.title.split(':')[0]}</CardTitle>
+                                <p className="text-sm text-gray-500 font-medium">{card.title.split(':')[1].trim()}</p>
+                              </>
+                            ) : (
+                              <CardTitle className="text-xl mb-2">{card.title}</CardTitle>
+                            )}
                           </CardContent>
                         </Card>
                       </Link>
@@ -113,7 +120,14 @@ export default function PreparePage() {
                       >
                         <Card className="h-full transition-all hover:shadow-md">
                           <CardContent className="p-6">
-                            <CardTitle className="text-xl mb-2">{card.title}</CardTitle>
+                            {card.title.includes(':') ? (
+                              <>
+                                <CardTitle className="text-xl mb-1">{card.title.split(':')[0]}</CardTitle>
+                                <p className="text-sm text-gray-500 font-medium">{card.title.split(':')[1].trim()}</p>
+                              </>
+                            ) : (
+                              <CardTitle className="text-xl mb-2">{card.title}</CardTitle>
+                            )}
                           </CardContent>
                         </Card>
                       </Link>

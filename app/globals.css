@@ -93,3 +93,133 @@ body {
     font-feature-settings: "rlig" 1, "calt" 1;
   }
 }
+
+/* Support for color transitions in prepare pages */
+.prepare-transition * {
+  transition: color 0.3s ease-out, background-color 0.3s ease-out, border-color 0.3s ease-out, opacity 0.3s ease-out;
+}
+
+/* Dark theme for prepare pages */
+.prepare-dark-mode {
+  color-scheme: dark;
+}
+
+/* Styles for dark mode in prepare pages */
+.prepare-dark-mode .prose {
+  --tw-prose-body: rgb(220, 220, 220);
+  --tw-prose-headings: rgb(255, 255, 255);
+  --tw-prose-lead: rgb(229, 229, 229);
+  --tw-prose-links: rgb(147, 197, 253);
+  --tw-prose-bold: rgb(255, 255, 255);
+  --tw-prose-counters: rgb(209, 213, 219);
+  --tw-prose-bullets: rgb(209, 213, 219);
+  --tw-prose-hr: rgb(75, 85, 99);
+  --tw-prose-quotes: rgb(255, 255, 255);
+  --tw-prose-quote-borders: rgb(75, 85, 99);
+  --tw-prose-captions: rgb(180, 180, 180);
+  --tw-prose-code: rgb(240, 240, 240);
+  --tw-prose-pre-code: rgb(209, 213, 219);
+  --tw-prose-pre-bg: rgb(40, 40, 40);
+  --tw-prose-th-borders: rgb(75, 85, 99);
+  --tw-prose-td-borders: rgb(75, 85, 99);
+}
+
+/* Update card styles for dark mode transition */
+.prepare-dark-mode .card {
+  background-color: rgba(30, 30, 30, 0.8);
+  backdrop-filter: blur(12px);
+  border-color: rgba(75, 75, 75, 0.5);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+}
+
+/* Enhanced styles for prepare page markdown content */
+.prepare-content .prose {
+  font-size: 1.05rem;
+  line-height: 1.7;
+}
+
+.prepare-content .prose h2 {
+  font-size: 1.65rem;
+  margin-top: 2rem;
+  margin-bottom: 1rem;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  color: rgb(240, 240, 240);
+}
+
+.prepare-content .prose h3 {
+  font-size: 1.35rem;
+  margin-top: 1.5rem;
+  margin-bottom: 0.75rem;
+  font-weight: 600;
+  color: rgb(230, 230, 230);
+}
+
+.prepare-content .prose ul {
+  margin-top: 0.75rem;
+  margin-bottom: 1.25rem;
+}
+
+.prepare-content .prose li {
+  margin-top: 0.375rem;
+  margin-bottom: 0.375rem;
+}
+
+.prepare-content .prose a {
+  text-decoration: none;
+  position: relative;
+  font-weight: 500;
+  color: rgb(147, 197, 253);
+}
+
+.prepare-content .prose a:hover {
+  text-decoration: underline;
+  color: rgb(186, 217, 252);
+}
+
+/* Animations for prepare page */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.prepare-animate-title {
+  animation: fadeIn 0.8s ease-out forwards;
+}
+
+.prepare-animate-description {
+  animation: fadeIn 0.8s ease-out 0.2s forwards;
+  opacity: 0;
+}
+
+/* Custom glow effects for dark theme */
+.prepare-dark-glow {
+  position: absolute;
+  opacity: 0.05;
+  filter: blur(50px);
+  border-radius: 100%;
+  background: linear-gradient(45deg, rgb(59, 130, 246), rgb(147, 51, 234));
+  height: 150px;
+  width: 150px;
+  z-index: -1;
+  pointer-events: none;
+}
+
+/* Improved scrollbar for dark theme */
+.prepare-dark-mode::-webkit-scrollbar {
+  width: 12px;
+}
+
+.prepare-dark-mode::-webkit-scrollbar-track {
+  background: rgb(30, 30, 30);
+}
+
+.prepare-dark-mode::-webkit-scrollbar-thumb {
+  background-color: rgb(75, 75, 75);
+  border-radius: 6px;
+  border: 3px solid rgb(30, 30, 30);
+}
+
+.prepare-dark-mode::-webkit-scrollbar-thumb:hover {
+  background-color: rgb(100, 100, 100);
+}
