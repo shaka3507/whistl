@@ -7,9 +7,10 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { FloatingChatButton } from "@/components/floating-chat-button"
 import ReactMarkdown from "react-markdown"
-import { ArrowLeftCircle, AlertTriangle, BookOpen, ExternalLink, ChevronDown } from "lucide-react"
+import { ArrowLeftCircle, AlertTriangle, BookOpen, ExternalLink, ChevronDown, Search } from "lucide-react"
 import Link from "next/link"
 import { cn } from "@/lib/utils"
+import { Input } from "@/components/ui/input"
 
 // Define the type for the JSON data structure
 interface PrepareData {
@@ -31,6 +32,7 @@ export default function PreparePage() {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [scrollProgress, setScrollProgress] = useState(0)
+  const [searchTerm, setSearchTerm] = useState("")
   const contentRef = useRef<HTMLDivElement>(null)
 
   // Handle scroll to update text color
@@ -140,6 +142,24 @@ export default function PreparePage() {
     };
   };
 
+  // Filter sections based on search term
+  const filteredSections = useMemo(() => {
+    if (!data || !searchTerm.trim()) {
+      return data?.sections || [];
+    }
+    
+    const lowerCaseSearch = searchTerm.toLowerCase();
+    
+    return (data.sections || []).filter(section => 
+      section.title.toLowerCase().includes(lowerCaseSearch) ||
+      section.content.toLowerCase().includes(lowerCaseSearch)
+    );
+  }, [data, searchTerm]);
+
+  // Check if any sections are filtered out
+  const hasFilteredResults = searchTerm.trim() !== "" && data?.sections && 
+    filteredSections.length > 0 && filteredSections.length < data.sections.length;
+
   // Loading state with black theme
   if (isLoading) {
     return (
@@ -207,9 +227,12 @@ export default function PreparePage() {
         {data && (
           <>
             <div className="mb-20 max-w-3xl mx-auto relative">
-              <Link href="/prepare">
-                  <ArrowLeftCircle className="mr-2 h-9 w-9 text-5xl mb-4" />
-              </Link>
+              <div className="flex items-center justify-between mb-4">
+                <Link href="/prepare">
+                  <ArrowLeftCircle className="mr-2 h-9 w-9 text-5xl" />
+                </Link>
+              </div>
+
               <h1 
                 className="text-4xl md:text-5xl font-bold mb-2 prepare-animate-title text-gray-100" 
                 style={{
@@ -220,6 +243,7 @@ export default function PreparePage() {
               >
                 {data.title.includes(':') ? data.title.split(':')[0] : data.title}
               </h1>
+              
               {data.title.includes(':') && (
                 <p 
                   className="text-2xl md:text-3xl font-medium mb-6 prepare-animate-title text-gray-300" 
@@ -232,6 +256,7 @@ export default function PreparePage() {
                   {data.title.split(':')[1].trim()}
                 </p>
               )}
+              
               <p 
                 className="text-lg mb-8 prepare-animate-description text-gray-300" 
                 style={{
@@ -272,6 +297,40 @@ export default function PreparePage() {
               />
             </div>
 
+            {/* Sticky search bar */}
+            <div className="sticky top-5 z-50 mb-8 max-w-3xl mx-auto transition-all duration-300"
+                style={{
+                  opacity: Math.min(1, scrollProgress * 5 + 0.2),
+                  transform: scrollProgress > 0.05 ? 'translateY(0)' : 'translateY(-100%)',
+                }}
+            >
+              <div className="relative w-full">
+                <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
+                  <Search className="h-4 w-4 text-gray-400" />
+                </div>
+                <Input
+                  type="text"
+                  placeholder="Search this guide..."
+                  className="pl-10 py-2 h-10 w-full bg-black/70 border-gray-800/30 text-gray-200 placeholder:text-gray-500 shadow-lg backdrop-blur-md rounded-lg"
+                  value={searchTerm}
+                  onChange={(e) => {
+                    console.log("Search input changed:", e.target.value);
+                    setSearchTerm(e.target.value);
+                  }}
+                />
+                {searchTerm.trim() !== "" && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => setSearchTerm("")}
+                    className="absolute right-2 top-1/2 transform -translate-y-1/2 h-7 w-7 p-0 text-gray-400 hover:text-white"
+                  >
+                    ×
+                  </Button>
+                )}
+              </div>
+            </div>
+
             {/* Main content */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mt-16">
               {/* Left column - Table of contents */}
@@ -280,26 +339,47 @@ export default function PreparePage() {
                   <Card className="bg-black/30 border-gray-800/30 backdrop-filter backdrop-blur-sm border transition-all duration-300 shadow-xl">
                     <CardContent className="p-6">
                       <h2 
-                        className="text-xl font-semibold mb-4 flex items-center"
+                        className="text-xl font-semibold mb-4 flex items-center justify-between"
                         style={getTextColorStyle()}
                       >
-                        <BookOpen 
-                          className="mr-2 h-5 w-5" 
-                          style={getTextColorStyle()}
-                        />
-                        Contents
+                        <div className="flex items-center">
+                          <BookOpen 
+                            className="mr-2 h-5 w-5" 
+                            style={getTextColorStyle()}
+                          />
+                          <span>Contents</span>
+                        </div>
+                        {searchTerm.trim() !== "" && (
+                          <span className="text-sm text-gray-400">
+                            {filteredSections.length} of {data.sections.length}
+                          </span>
+                        )}
                       </h2>
                       <nav className="space-y-1">
-                        {data.sections.map((section, index) => (
-                          <a 
-                            key={index}
-                            href={`#section-${index}`}
-                            className="block p-2 rounded-md transition-colors hover:bg-gray-900/50"
-                            style={getTextColorStyle(index * 0.1)} // Staggered effect
-                          >
-                            {section.title}
-                          </a>
-                        ))}
+                        {data.sections.map((section, index) => {
+                          // Check if this section is in our filtered results
+                          const isVisible = !searchTerm.trim() || filteredSections.some(s => s.title === section.title);
+                          
+                          return (
+                            <a 
+                              key={index}
+                              href={`#section-${index}`}
+                              className={cn(
+                                "block p-2 rounded-md transition-colors hover:bg-gray-900/50",
+                                searchTerm.trim() !== "" && !isVisible && "opacity-40 line-through"
+                              )}
+                              style={getTextColorStyle(index * 0.1)}
+                              onClick={() => {
+                                // If this section isn't visible due to filtering, clear search when clicked
+                                if (!isVisible) {
+                                  setSearchTerm("");
+                                }
+                              }}
+                            >
+                              {section.title}
+                            </a>
+                          );
+                        })}
                       </nav>
                     </CardContent>
                   </Card>
@@ -308,28 +388,48 @@ export default function PreparePage() {
 
               {/* Right columns - Content sections */}
               <div className="lg:col-span-2 space-y-12">
-                {data.sections.map((section, index) => (
-                  <div 
-                    key={index} 
-                    id={`section-${index}`} 
-                    className="scroll-mt-20"
-                    style={getFadeStyle(0.1 + index * 0.1, 0.25 + index * 0.1)}
-                  >
-                    <h2 
-                      className="text-2xl font-bold mb-4"
-                      style={getTextColorStyle(index * 0.1)} // Staggered effect
+                {searchTerm.trim() !== "" && filteredSections.length === 0 ? (
+                  <div className="bg-black/30 border border-gray-800/50 rounded-lg p-8 text-center">
+                    <h3 className="text-xl text-gray-300 mb-2">No sections found matching "{searchTerm}"</h3>
+                    <p className="text-gray-400">Try a different search term or clear your search</p>
+                    <Button 
+                      variant="outline" 
+                      className="mt-4 border-gray-700 text-gray-300"
+                      onClick={() => setSearchTerm("")}
                     >
-                      {section.title}
-                    </h2>
-                    <Card className="bg-black/40 border-gray-800/30 backdrop-filter backdrop-blur-sm border transition-all duration-300">
-                      <CardContent className="p-6 prose prose-invert max-w-none">
-                        <div style={getTextColorStyle(index * 0.1 + 0.05)}>
-                          <ReactMarkdown>{section.content}</ReactMarkdown>
-                        </div>
-                      </CardContent>
-                    </Card>
+                      Clear Search
+                    </Button>
                   </div>
-                ))}
+                ) : (
+                  <>
+                    {filteredSections.map((section, originalIndex) => {
+                      // Find the original index in the unfiltered array for correct ID anchors
+                      const index = data.sections.findIndex(s => s.title === section.title);
+                      return (
+                        <div 
+                          key={index} 
+                          id={`section-${index}`} 
+                          className="scroll-mt-20"
+                          style={getFadeStyle(0.1 + index * 0.1, 0.25 + index * 0.1)}
+                        >
+                          <h2 
+                            className="text-2xl font-bold mb-4"
+                            style={getTextColorStyle(index * 0.1)} // Staggered effect
+                          >
+                            {section.title}
+                          </h2>
+                          <Card className="bg-black/40 border-gray-800/30 backdrop-filter backdrop-blur-sm border transition-all duration-300">
+                            <CardContent className="p-6 prose prose-invert max-w-none">
+                              <div style={getTextColorStyle(index * 0.1 + 0.05)}>
+                                <ReactMarkdown>{section.content}</ReactMarkdown>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        </div>
+                      );
+                    })}
+                  </>
+                )}
 
                 {/* Resources section */}
                 {data.resources && data.resources.length > 0 && (
