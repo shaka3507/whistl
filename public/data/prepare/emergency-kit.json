@@ -1,28 +1,52 @@
 {
   "title": "Emergency Kit Essentials: Your Lifeline in Crisis",
-  "description": "Learn about emergency kit essentials: your lifeline in crisis. This is a placeholder description.",
+  "description": "A well-stocked emergency kit is crucial for survival when disaster strikes. Learn what supplies to gather, how to maintain your kit, and where to store emergency supplies to be prepared for any situation.",
   "sections": [
     {
-      "title": "Before",
-      "content": "## Preparation\n\nThis is placeholder content. You should replace this with real content about preparation steps.\n\n- Step 1\n- Step 2\n- Step 3"
+      "title": "Basic Disaster Supplies Kit",
+      "content": "Your basic emergency supply kit should be stored in airtight plastic bags and placed in one or two easy-to-carry containers such as plastic bins or a duffel bag. Include these essential items:\n\n- **Water**: One gallon per person per day for several days, for drinking and sanitation\n- **Food**: At least a several-day supply of non-perishable food\n- **Battery-powered or hand crank radio** and a NOAA Weather Radio with tone alert\n- **Flashlight** with extra batteries\n- **First aid kit**\n- **Whistle** to signal for help\n- **Dust mask** to help filter contaminated air\n- **Plastic sheeting, scissors and duct tape** for sheltering in place\n- **Moist towelettes, garbage bags and plastic ties** for personal sanitation\n- **Wrench or pliers** to turn off utilities\n- **Manual can opener** for food\n- **Local maps** for navigation\n- **Cell phone with chargers and a backup battery**"
     },
     {
-      "title": "During",
-      "content": "## Immediate Actions\n\nThis is placeholder content. You should replace this with real content about what to do during this event.\n\n- Action 1\n- Action 2\n- Action 3"
+      "title": "Additional Emergency Supplies",
+      "content": "Consider adding these items to your emergency kit based on your household's specific needs:\n\n- **Cleaning supplies**: Soap, hand sanitizer and disinfecting wipes\n- **Medications**: Prescription medications (half of all Americans take daily prescription medicine)\n- **Over-the-counter medications**: Pain relievers, anti-diarrhea medication, antacids or laxatives\n- **Vision needs**: Prescription eyeglasses and contact lens solution\n- **Baby supplies**: Infant formula, bottles, diapers, wipes and diaper rash cream\n- **Pet supplies**: Pet food and extra water for your pet\n- **Financial resources**: Cash or traveler's checks\n- **Documents**: Important family documents such as copies of insurance policies, identification and bank account records (saved electronically or in a waterproof, portable container)\n- **Bedding**: Sleeping bag or warm blanket for each person\n- **Clothing**: Complete change of clothing appropriate for your climate and sturdy shoes\n- **Fire safety**: Fire extinguisher\n- **Emergency lighting**: Matches in a waterproof container\n- **Personal items**: Feminine supplies and personal hygiene items\n- **Kitchen supplies**: Mess kits, paper cups, plates, paper towels and plastic utensils\n- **Communication tools**: Paper and pencil\n- **Entertainment**: Books, games, puzzles or other activities for children"
     },
     {
-      "title": "After",
-      "content": "## Recovery\n\nThis is placeholder content. You should replace this with real content about recovery steps.\n\n- Recovery step 1\n- Recovery step 2\n- Recovery step 3"
+      "title": "Maintaining Your Kit",
+      "content": "An emergency kit is only effective if it's properly maintained and ready when needed:\n\n- Keep canned food in a cool, dry place\n- Store boxed food in tightly closed plastic or metal containers\n- Replace expired items as needed\n- Re-think your needs every year and update your kit as your family's needs change\n\nConsider setting calendar reminders to check your kit every six months. This is also a good time to check smoke detector batteries and review your family emergency plan."
+    },
+    {
+      "title": "Kit Storage Locations",
+      "content": "Since emergencies can happen anywhere at any time, prepare supplies for multiple locations:\n\n- **Home Kit**: Keep this in a designated place and have it ready in case you have to leave your home quickly. Make sure all family members know where the kit is kept.\n\n- **Work Kit**: Be prepared to shelter at work for at least 24 hours. Your work kit should include food, water and other necessities like medicines, as well as comfortable walking shoes, stored in a \"grab and go\" case.\n\n- **Car Kit**: In case you are stranded, keep a kit of emergency supplies in your car. This is especially important during winter months when travel can be hazardous.\n\nEach kit may contain different items based on the location and potential emergencies you might face in that environment."
+    },
+    {
+      "title": "Special Considerations",
+      "content": "Different household members may have unique needs to consider when building your emergency kit:\n\n- **Children**: Include comfort items, activities, and familiar snacks\n\n- **Seniors**: Consider medical devices, mobility aids, and any special dietary requirements\n\n- **People with disabilities**: Include necessary assistive technologies, extra medication, and instructions for medical equipment\n\n- **Pets and service animals**: Have leashes, carriers, food, water, bowls, and documentation\n\nThink about your family's specific requirements and add items that address their individual needs."
+    },
+    {
+      "title": "Low-Cost Preparedness",
+      "content": "Building an emergency kit doesn't have to be expensive. Here are some budget-friendly tips:\n\n- Start small and build your kit over time\n- Purchase items when they're on sale\n- Use containers you already have at home\n- Check dollar stores for supplies like flashlights, batteries, and first aid items\n- Rotate food from your regular pantry into your emergency supplies\n- Share bulk purchases with friends or family members also building kits\n\nRemember, having some supplies is better than none. Even a partial kit will be valuable during an emergency."
     }
   ],
   "resources": [
     {
-      "title": "FEMA Website",
-      "url": "https://www.ready.gov/"
+      "title": "Ready.gov: Build A Kit",
+      "url": "https://www.ready.gov/kit"
     },
     {
-      "title": "Red Cross Resources",
-      "url": "https://www.redcross.org/"
+      "title": "Ready.gov: Emergency Supply Checklist (PDF)",
+      "url": "https://www.ready.gov/sites/default/files/2021-02/ready_checklist.pdf"
+    },
+    {
+      "title": "Red Cross: Survival Kit Supplies",
+      "url": "https://www.redcross.org/get-help/how-to-prepare-for-emergencies/survival-kit-supplies.html"
+    },
+    {
+      "title": "CDC: Emergency Kit Checklist for Families",
+      "url": "https://www.cdc.gov/childrenindisasters/checklists/kids-and-families.html"
+    },
+    {
+      "title": "FEMA: Emergency Supply List",
+      "url": "https://www.fema.gov/sites/default/files/documents/fema_emergency-supply-list_04_27_2024.pdf"
     }
   ]
 }

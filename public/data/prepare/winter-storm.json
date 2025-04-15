@@ -1,28 +1,52 @@
 {
   "title": "Winter Storm Survival: Beat the Freeze",
-  "description": "Learn about winter storm survival: beat the freeze. This is a placeholder description.",
+  "description": "Essential knowledge and practical tips to stay safe during extreme cold weather events, including polar vortex conditions, winter storms, and freezing temperatures.",
   "sections": [
     {
-      "title": "Before",
-      "content": "## Preparation\n\nThis is placeholder content. You should replace this with real content about preparation steps.\n\n- Step 1\n- Step 2\n- Step 3"
+      "title": "Understanding Cold Weather Dangers",
+      "content": "Extreme cold poses serious health risks that can develop rapidly. The two main dangers are:\n\n- **Hypothermia**: When your body temperature drops to dangerously low levels, causing your body to shut down\n- **Frostbite**: Tissue damage from freezing, most common on extremities (fingers, toes, nose, ears)\n\nBefore frostbite develops, watch for **frostnip** - the early warning sign where skin becomes white and waxy. This is absolutely the point to intervene, as frostnip can happen in just a few minutes. Common areas are hands and cheeks, which you may not see yourself, so having someone check you (and checking them) is important.\n\nWhen frostnip occurs, get out of the cold immediately or cover the area with a hand or glove to stop exposure. Bringing back pinkness to the skin is crucial, though you may still lose some surface skin layers."
     },
     {
-      "title": "During",
-      "content": "## Immediate Actions\n\nThis is placeholder content. You should replace this with real content about what to do during this event.\n\n- Action 1\n- Action 2\n- Action 3"
+      "title": "Preparation and Indoor Safety",
+      "content": "The best way to avoid risk during extreme cold is to stay indoors when possible:\n\n- Stock up on food, water, and medication before a storm hits\n- Keep faucets dripping slightly to prevent pipes from freezing\n- Bring pets inside during extreme cold\n- Have alternative heating sources ready (with proper ventilation)\n- Keep emergency phone numbers handy\n- Check on elderly neighbors and those who might need assistance\n\nIf heat is limited, concentrate activities in a central room. Seal doorways with towels and cover windows with blankets to retain heat."
     },
     {
-      "title": "After",
-      "content": "## Recovery\n\nThis is placeholder content. You should replace this with real content about recovery steps.\n\n- Recovery step 1\n- Recovery step 2\n- Recovery step 3"
+      "title": "Dressing for Extreme Cold",
+      "content": "When you must go outside, proper clothing is essential. Dress in layers following these guidelines:\n\n- **Mittens** provide better warmth than gloves\n- Wear a **hat** to reduce heat loss through your head\n- Cover your face with **scarves or balaclavas** to protect from cold air\n- **Insulating trousers** or wearing pajamas under regular pants adds crucial leg protection\n- Use **practical footwear** that's insulated but not too tight (too many socks can restrict circulation)\n\nProtect your eyes with goggles or glasses in extremely cold and windy conditions. Remember: walking in jeans at temperatures of -30°F/-35°C won't cause immediate frostbite but can quickly lead to hypothermia."
+    },
+    {
+      "title": "Vehicle Emergency Preparedness",
+      "content": "If you must travel during extreme cold, prepare your vehicle with emergency supplies:\n\n- **Sleeping bag or blankets** to keep warm if stranded\n- **Warm fluids** in a thermos to maintain body temperature\n- **Food** for energy (high-calorie snacks like nuts or chocolate)\n- **Shovel** to dig out of snow\n- **Traction aids** (sand, kitty litter, or even hessian sacks)\n- **Fully charged phone** and car charger\n- **Flashlight** with extra batteries\n\nIf stranded, **stay in your car** out of the wind. Wind chill dramatically increases the risk of cold-related injuries. Don't attempt to walk to a nearby town or gas station - this is when people often misjudge conditions and rapidly lose core body temperature, succumbing to hypothermia."
+    },
+    {
+      "title": "Know Your Limits",
+      "content": "Being aware of your body's signals is crucial in extreme cold:\n\n- If working outside, take regular breaks indoors to warm up\n- Consume warm drinks and snacks to maintain energy and body heat\n- Stay active to maintain circulation, but avoid excessive sweating\n- Watch for numbness, which is an early sign of hypothermia\n- Be alert for confusion or unusual behavior in yourself or others\n\nIn severe hypothermia, people may paradoxically feel warm and remove clothing when they're actually in danger. This is a medical emergency requiring immediate attention.\n\nRemember: \"It only takes one slip-up to lead to permanent injury, but if a person goes about their daily affairs carefully and prepared, you should be fine.\""
+    },
+    {
+      "title": "Understanding Wind Chill",
+      "content": "Wind chill dramatically increases the rate at which your body loses heat. For example, an air temperature of 0°F (-18°C) with a 15 mph wind feels like -19°F (-28°C) on exposed skin.\n\nAs wind chill decreases, the risk of frostbite increases rapidly. At -15°F (-26°C) with moderate wind, exposed skin can freeze in just 30 minutes. At -25°F (-32°C) with the same wind, frostbite can occur in 10 minutes.\n\nWhen planning outdoor activities in winter, always check both the temperature AND the wind chill factor, and limit exposure accordingly."
     }
   ],
   "resources": [
     {
-      "title": "FEMA Website",
-      "url": "https://www.ready.gov/"
+      "title": "CDC: Extreme Cold Guide",
+      "url": "https://www.cdc.gov/disasters/winter/index.html"
     },
     {
-      "title": "Red Cross Resources",
-      "url": "https://www.redcross.org/"
+      "title": "BBC: Polar Vortex - A Guide to Surviving Extreme Cold",
+      "url": "https://www.bbc.com/news/world-us-canada-47070053"
+    },
+    {
+      "title": "National Weather Service - Wind Chill Chart",
+      "url": "https://www.weather.gov/safety/cold-wind-chill-chart"
+    },
+    {
+      "title": "Red Cross: Winter Storm Safety",
+      "url": "https://www.redcross.org/get-help/how-to-prepare-for-emergencies/types-of-emergencies/winter-storm.html"
+    },
+    {
+      "title": "FEMA: Winter Weather Preparedness",
+      "url": "https://www.ready.gov/winter-weather"
     }
   ]
 }

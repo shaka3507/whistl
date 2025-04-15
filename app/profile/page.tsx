@@ -7,7 +7,7 @@ import { Header } from "@/components/header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2, Upload, User } from "lucide-react";
+import { Loader2, Upload, User, ExternalLink } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { toast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
@@ -22,10 +22,16 @@ export default function ProfilePage() {
   const [avatarUrl, setAvatarUrl] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [emergencyContactName, setEmergencyContactName] = useState("");
+  const [emergencyContactPhone, setEmergencyContactPhone] = useState("");
+  const [notes, setNotes] = useState("");
+  const [importantDocuments, setImportantDocuments] = useState<File | null>(null);
+  const [safeSpaceAddress, setSafeSpaceAddress] = useState("");
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
 
   useEffect(() => {
     if (!user) {
-      router.push("/login");
+      setIsCheckingAuth(false);
       return;
     }
 
@@ -34,7 +40,12 @@ export default function ProfilePage() {
       setUsername(profile.username || "");
       setAvatarUrl(profile.avatar_url || "");
     }
+    setIsCheckingAuth(false);
   }, [user, profile, router]);
+
+  if (isCheckingAuth) {
+    return <div className="flex items-center justify-center h-screen">Loading...</div>;
+  }
 
   const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     try {
@@ -108,6 +119,15 @@ export default function ProfilePage() {
     }
   };
 
+  const handleDocumentUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || e.target.files.length === 0) {
+      return;
+    }
+
+    const file = e.target.files[0];
+    setImportantDocuments(file);
+  };
+
   if (!user) {
     return null;
   }
@@ -178,6 +198,63 @@ export default function ProfilePage() {
                   type="text"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="emergencyContactName">Emergency Contact Name</Label>
+                <Input
+                  id="emergencyContactName"
+                  type="text"
+                  value={emergencyContactName}
+                  onChange={(e) => setEmergencyContactName(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="emergencyContactPhone">Emergency Contact Phone</Label>
+                <Input
+                  id="emergencyContactPhone"
+                  type="tel"
+                  value={emergencyContactPhone}
+                  onChange={(e) => setEmergencyContactPhone(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="notes">Notes</Label>
+                <textarea
+                  id="notes"
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  className="w-full p-2 border rounded"
+                  rows={4}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="importantDocuments">Important Documents</Label>
+                <input
+                  id="importantDocuments"
+                  type="file"
+                  onChange={handleDocumentUpload}
+                  className="w-full"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="safeSpaceAddress">Address to Safe Space
+                <br/>
+                <a
+                  href="https://egateway.fema.gov/ESF6/DRCLocator"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-500 hover:underline flex items-center"
+                >
+                  Local Disaster Recovery Centers
+                  <ExternalLink className="ml-1 h-4 w-4" />
+                </a>
+                </Label>
+                <Input
+                  id="safeSpaceAddress"
+                  type="text"
+                  value={safeSpaceAddress}
+                  onChange={(e) => setSafeSpaceAddress(e.target.value)}
                 />
               </div>
               <Button type="submit" className="w-full" disabled={isLoading}>
