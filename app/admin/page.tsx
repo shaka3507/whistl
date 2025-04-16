@@ -212,6 +212,29 @@ export default function AdminPage() {
     fetchUsers()
   }, [user])
 
+  const toggleBlockUser = async (userId: string, isBlocked: boolean) => {
+    try {
+      const { error } = await supabase
+        .from("profiles")
+        .update({ blocked: !isBlocked })
+        .eq("id", userId);
+
+      if (error) {
+        throw error;
+      }
+
+      // Update the local state to reflect the change
+      setUsers((prevUsers) =>
+        prevUsers.map((user) =>
+          user.id === userId ? { ...user, blocked: !isBlocked } : user
+        )
+      );
+    } catch (err) {
+      console.error("Error toggling block status:", err);
+      setUserError("Failed to update user status");
+    }
+  };
+
   return (
     <div className="flex min-h-screen flex-col">
       <Header />
@@ -385,7 +408,11 @@ export default function AdminPage() {
                           <div>
                             <CardTitle>{user.full_name || user.username}</CardTitle>
                             <CardDescription>
-          
+                              {user.blocked ? (
+                                <span className="text-red-500">Blocked</span>
+                              ) : (
+                                <span className="text-green-500">Active</span>
+                              )}
                               {user.last_message_time && (
                                 <div className="mt-2 text-sm text-muted-foreground">
                                   Last active: {new Date(user.last_message_time).toLocaleString()}
@@ -415,8 +442,12 @@ export default function AdminPage() {
                               </Button>
                             </>
                           )}
-                          <Button variant="outline" size="sm">
-                            Manage Permissions
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => toggleBlockUser(user.id, user.blocked)}
+                          >
+                            {user.blocked ? "Unblock User" : "Block User"}
                           </Button>
                         </div>
                       </CardHeader>

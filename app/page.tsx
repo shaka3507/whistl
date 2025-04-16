@@ -99,7 +99,7 @@ export default function Home() {
                     className="card flex flex-col justify-center space-y-4 text-center p-6 shadow-lg rounded-lg bg-white/10 text-white"
                   >
                     <div className="flex items-center justify-center h-12 w-full">
-                      <item.icon className="h-6 w-6" />
+                      <item.icon className="h-20 w-20 text-primary" />
                     </div>
                     <h3 className="text-xl font-bold">{item.title}</h3>
                     <p className="text-muted-foreground">{item.description}</p>
