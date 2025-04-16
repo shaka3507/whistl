@@ -1,6 +1,7 @@
 {
   "title": "Hurricane Preparedness: Before, During & After",
   "description": "Essential information to help you prepare for, survive during, and recover after a hurricane.",
+  "is_module": true,
   "sections": [
     {
       "title": "Before a Hurricane",
@@ -27,6 +28,58 @@
     {
       "title": "Red Cross Hurricane Safety",
       "url": "https://www.redcross.org/get-help/how-to-prepare-for-emergencies/types-of-emergencies/hurricane.html"
+    }
+  ],
+  "questions": [
+    {
+      "question": "What should you do if you live in an evacuation area?",
+      "options": [
+        "Stay at home and wait for instructions",
+        "Evacuate immediately",
+        "Ignore evacuation orders",
+        "Wait until the last minute to leave"
+      ],
+      "answer": "Evacuate immediately"
+    },
+    {
+      "question": "What is one of the first things you should do after a hurricane?",
+      "options": [
+        "Return home immediately",
+        "Check for downed power lines",
+        "Go sightseeing",
+        "Ignore safety warnings"
+      ],
+      "answer": "Check for downed power lines"
+    },
+    {
+      "question": "How much water should you have per person per day in your emergency kit?",
+      "options": [
+        "1 gallon",
+        "2 gallons",
+        "3 gallons",
+        "4 gallons"
+      ],
+      "answer": "1 gallon"
+    },
+    {
+      "question": "What should you do if you smell gas upon returning home after a hurricane?",
+      "options": [
+        "Open all windows",
+        "Turn on the lights",
+        "Leave immediately and call 9-1-1",
+        "Ignore it"
+      ],
+      "answer": "Leave immediately and call 9-1-1"
+    },
+    {
+      "question": "What is a safe place to take refuge during a hurricane if you are staying home?",
+      "options": [
+        "Near windows",
+        "In a small interior room on the lowest level",
+        "In the garage",
+        "On the roof"
+      ],
+      "answer": "In a small interior room on the lowest level"
     }
   ]
 } 

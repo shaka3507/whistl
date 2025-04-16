@@ -79,75 +79,79 @@ export default function PreparePage() {
   const contentRef = useRef<HTMLDivElement>(null);
   const quizRef = useRef<HTMLDivElement>(null);
 
-  const [currentQuestion, setCurrentQuestion] = useState(0)
-const [selectedOptions, setSelectedOptions] = useState<{ [key: number]: string }>({})
-const [quizResults, setQuizResults] = useState({
-  correctAnswers: 0,
-  totalQuestions: 0,
-  percentageCorrect: 0,
-});
-const [isQuizCompleted, setIsQuizCompleted] = useState(false);
+  const [currentQuestion, setCurrentQuestion] = useState(0);
+  const [selectedOptions, setSelectedOptions] = useState<{
+    [key: number]: string;
+  }>({});
+  const [quizResults, setQuizResults] = useState({
+    correctAnswers: 0,
+    totalQuestions: 0,
+    percentageCorrect: 0,
+  });
+  const [isQuizCompleted, setIsQuizCompleted] = useState(false);
 
-const handleOptionSelect = (option: string) => {
-  setSelectedOptions({ ...selectedOptions, [currentQuestion]: option })
-}
+  const handleOptionSelect = (option: string) => {
+    setSelectedOptions({ ...selectedOptions, [currentQuestion]: option });
+  };
 
-const goToNext = async () => {
-  if (currentQuestion < (quizQuestions?.length || 1) - 1) {
-    setCurrentQuestion(currentQuestion + 1);
-  } else {
-    // Evaluate answers
-    const correctAnswers = quizQuestions?.filter((q, index) => q.answer === selectedOptions[index]).length || 0;
-    const totalQuestions = quizQuestions?.length || 1;
-    const percentageCorrect = (correctAnswers / totalQuestions) * 100;
+  const goToNext = async () => {
+    if (currentQuestion < (quizQuestions?.length || 1) - 1) {
+      setCurrentQuestion(currentQuestion + 1);
+    } else {
+      // Evaluate answers
+      const correctAnswers =
+        quizQuestions?.filter((q, index) => q.answer === selectedOptions[index])
+          .length || 0;
+      const totalQuestions = quizQuestions?.length || 1;
+      const percentageCorrect = (correctAnswers / totalQuestions) * 100;
 
-    // Display results in modal
-    setQuizResults({
-      correctAnswers,
-      totalQuestions,
-      percentageCorrect,
-    });
-    setIsQuizCompleted(true);
-  }
-};
-
-const handleModalClose = async () => {
-  // Get the user ID from Supabase auth
-  const { data: { user } } = await supabase.auth.getUser();
-
-  if (!user) {
-    console.error('User not authenticated');
-    return;
-  }
-
-  // Save completion status to Supabase
-  try {
-    const { error } = await supabase
-      .from('module_progress')
-      .insert([
-        { module_name: slug, user_id: user.id, completed: true }
-      ]);
-
-    if (error) {
-      throw error;
+      // Display results in modal
+      setQuizResults({
+        correctAnswers,
+        totalQuestions,
+        percentageCorrect,
+      });
+      setIsQuizCompleted(true);
     }
+  };
+
+  const handleModalClose = async () => {
+    // Get the user ID from Supabase auth
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      console.error("User not authenticated");
+      return;
+    }
+
+    // Save completion status to Supabase
+    try {
+      const { error } = await supabase
+        .from("module_progress")
+        .insert([{ module_name: slug, user_id: user.id, completed: true }]);
+
+      if (error) {
+        throw error;
+      }
+      setIsQuizCompleted(true);
+      setIsQuizOpen(false);
+      console.log("Progress saved successfully");
+    } catch (error) {
+      setIsQuizCompleted(false);
+      console.error("Error saving progress:", error);
+    }
+
+    // Reset quiz state
     setIsQuizCompleted(true);
-    setIsQuizOpen(false);
-    console.log('Progress saved successfully');
-  } catch (error) {
-    setIsQuizCompleted(false);
-    console.error('Error saving progress:', error);
-  }
+  };
 
-  // Reset quiz state
-  setIsQuizCompleted(true);
-};
-
-const goToPrevious = () => {
-  if (currentQuestion > 0) {
-    setCurrentQuestion(currentQuestion - 1)
-  }
-}
+  const goToPrevious = () => {
+    if (currentQuestion > 0) {
+      setCurrentQuestion(currentQuestion - 1);
+    }
+  };
 
   // Handle scroll to update text color
   useEffect(() => {
@@ -362,7 +366,6 @@ const goToPrevious = () => {
       style={getBackgroundStyle()}
       className="min-h-screen prepare-transition overflow-x-hidden prepare-content prepare-dark-mode"
     >
-      
       {/* Background glow effects */}
       <div
         className="prepare-dark-glow fixed top-[20%] left-[10%]"
@@ -657,120 +660,134 @@ const goToPrevious = () => {
                 )}
               </div>
             </div>
-                            {/* Quiz Section */}
-                            {data.is_module && data.questions && (
-                  <div
-                    className="mt-16 p-8"
-                    style={getFadeStyle(0.7, 0.9)}
-                    ref={quizRef}
-                  >
-                    <Dialog>
-                      <DialogTrigger asChild>
-                        <Button
-                          onClick={scrollToQuiz}
-                          className="bg-blue-200 text-lg text-primary-foreground hover:bg-blue-900/90 hover:text-white w-full"
-                        >
-                          Take Quiz
-                        </Button>
-                      </DialogTrigger>
-                      <DialogContent 
-                        className="w-screen max-w-full h-screen md:max-w-3xl md:h-auto m-0 p-0 text-white rounded-none md:rounded-2xl flex flex-col"
-                      >
-                        {isQuizCompleted ? (
-                          <div className="p-6 text-center">
-                            <h2 className="text-3xl font-bold mb-4">
-                              {quizResults.percentageCorrect === 100 ? 'Congratulations!' : 'Quiz Results'}
-                            </h2>
-                            <p className="text-xl mb-6">
-                              You got {quizResults.correctAnswers} out of {quizResults.totalQuestions} questions correct ({quizResults.percentageCorrect.toFixed(2)}%)
-                            </p>
-                            {quizResults.percentageCorrect < 100 ? (
-                              <Button onClick={() => setIsQuizCompleted(false)} className="bg-blue-500 text-white px-4 py-2 rounded-full">
-                                Try Again
-                              </Button>
-                            ) : (
-                              <p className="text-lg">Well done on completing the quiz!</p>
-                            )}
-                            <Button onClick={handleModalClose} className="mt-4 bg-green-500 text-white px-4 py-2 rounded-full">
-                              Close
-                            </Button>
-                          </div>
+            {/* Quiz Section */}
+            {data.is_module && data.questions && (
+              <div
+                className="mt-16 p-8"
+                style={getFadeStyle(0.7, 0.9)}
+                ref={quizRef}
+              >
+                <Dialog open={isQuizOpen} onOpenChange={setIsQuizOpen}>
+                  <DialogTrigger asChild>
+                    <Button
+                      onClick={() => setIsQuizOpen(true)}
+                      className="bg-blue-200 text-lg text-primary-foreground hover:bg-blue-900/90 hover:text-white w-full"
+                    >
+                      Take Quiz
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="w-screen max-w-full h-screen md:max-w-3xl md:h-auto m-0 p-0 text-white rounded-none md:rounded-2xl flex flex-col">
+                    {isQuizCompleted ? (
+                      <div className="p-6 text-center">
+                        <h2 className="text-3xl font-bold mb-4">
+                          {quizResults.percentageCorrect === 100
+                            ? "Congratulations!"
+                            : "Quiz Results"}
+                        </h2>
+                        <p className="text-xl mb-6">
+                          You got {quizResults.correctAnswers} out of{" "}
+                          {quizResults.totalQuestions} questions correct (
+                          {quizResults.percentageCorrect.toFixed(2)}%)
+                        </p>
+                        {quizResults.percentageCorrect < 100 ? (
+                          <Button
+                            onClick={() => setIsQuizCompleted(false)}
+                            className="bg-blue-500 text-white px-4 py-2 rounded-full"
+                          >
+                            Try Again
+                          </Button>
                         ) : (
-                          <div className="p-6">
-                            {/* Progress bar */}
-                            <div className="flex justify-center gap-2 mb-6">
-                              {[...Array(quizQuestions?.length || 4)].map((_, index) => (
-                                <div
-                                  key={index}
-                                  className={`w-6 h-2 rounded-full ${
-                                    index < currentQuestion
-                                      ? "bg-white"
-                                      : "bg-white/30"
-                                  }`}
-                                ></div>
-                              ))}
-                            </div>
-
-                            {/* Question content */}
-                            <div className="mb-6">
-                              {quizQuestions?.[currentQuestion]?.image && <img
-                                src="/placeholder-image.svg"
-                                alt="Illustration"
-                                className="w-24 h-24 mx-auto mb-4"
-                              />}
-                              <p className="text-xl font-bold text-center">
-                                {quizQuestions?.[currentQuestion]?.question}
-                              </p>
-                            </div>
-
-                            {/* Answer options */}
-                            <div className="grid grid-cols-2 gap-4 mb-6">
-                              {quizQuestions?.[currentQuestion]?.options.map(
-                                (option, i) => {
-                                  const letter = String.fromCharCode(65 + i); // A, B, C, D
-                                  const isSelected =
-                                    selectedOptions[currentQuestion] === option;
-
-                                  return (
-                                    <button
-                                      key={i}
-                                      onClick={() => handleOptionSelect(option)}
-                                      className={`flex items-center justify-center px-4 py-3 rounded-full font-semibold transition-all ${
-                                        isSelected
-                                          ? "bg-yellow-400 text-black"
-                                          : "bg-white text-black"
-                                      }`}
-                                    >
-                                      <span className="mr-2">{letter}.</span>{" "}
-                                      {option}
-                                    </button>
-                                  );
-                                }
-                              )}
-                            </div>
-
-                            {/* Navigation Buttons */}
-                            <div className="flex justify-between items-center">
-                              <button
-                                onClick={goToPrevious}
-                                className="bg-white/20 text-white rounded-full px-5 py-2"
-                                disabled={currentQuestion === 0}
-                              >
-                                <ArrowLeftCircle className="w-4 h-4 mr-2 h-9 w-9 text-5xl" />
-                              </button>
-                              <button
-                                onClick={goToNext}
-                                className="bg-white text-green-800 rounded-full px-5 py-2 font-semibold"
-                              >
-                                <ArrowRightCircle className="w-4 h-4 mr-2 h-9 w-9 text-5xl" />
-                              </button>
-                            </div>
-                          </div>
+                          <p className="text-lg">
+                            Well done on completing the quiz!
+                          </p>
                         )}
-                      </DialogContent>
-                    </Dialog>
-                  </div>
-                )}
+                        <Button
+                          onClick={handleModalClose}
+                          className="mt-4 bg-green-500 text-white px-4 py-2 rounded-full"
+                        >
+                          Close
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="p-6">
+                        {/* Progress bar */}
+                        <div className="flex justify-center gap-2 mb-6">
+                          {[...Array(quizQuestions?.length || 4)].map(
+                            (_, index) => (
+                              <div
+                                key={index}
+                                className={`w-6 h-2 rounded-full ${
+                                  index < currentQuestion
+                                    ? "bg-white"
+                                    : "bg-white/30"
+                                }`}
+                              ></div>
+                            )
+                          )}
+                        </div>
+
+                        {/* Question content */}
+                        <div className="mb-6">
+                          {quizQuestions?.[currentQuestion]?.image && (
+                            <img
+                              src="/placeholder-image.svg"
+                              alt="Illustration"
+                              className="w-24 h-24 mx-auto mb-4"
+                            />
+                          )}
+                          <p className="text-xl font-bold text-center">
+                            {quizQuestions?.[currentQuestion]?.question}
+                          </p>
+                        </div>
+
+                        {/* Answer options */}
+                        <div className="grid grid-cols-2 gap-4 mb-6">
+                          {quizQuestions?.[currentQuestion]?.options.map(
+                            (option, i) => {
+                              const letter = String.fromCharCode(65 + i); // A, B, C, D
+                              const isSelected =
+                                selectedOptions[currentQuestion] === option;
+
+                              return (
+                                <button
+                                  key={i}
+                                  onClick={() => handleOptionSelect(option)}
+                                  className={`flex items-center justify-center px-4 py-3 rounded-full font-semibold transition-all ${
+                                    isSelected
+                                      ? "bg-yellow-400 text-black"
+                                      : "bg-white text-black"
+                                  }`}
+                                >
+                                  <span className="mr-2">{letter}.</span>{" "}
+                                  {option}
+                                </button>
+                              );
+                            }
+                          )}
+                        </div>
+
+                        {/* Navigation Buttons */}
+                        <div className="flex justify-between items-center">
+                          <button
+                            onClick={goToPrevious}
+                            className="bg-white/20 text-white rounded-full px-5 py-2"
+                            disabled={currentQuestion === 0}
+                          >
+                            <ArrowLeftCircle className="w-4 h-4 mr-2 h-9 w-9 text-5xl" />
+                          </button>
+                          <button
+                            onClick={goToNext}
+                            className="bg-white text-green-800 rounded-full px-5 py-2 font-semibold"
+                          >
+                            <ArrowRightCircle className="w-4 h-4 mr-2 h-9 w-9 text-5xl" />
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </DialogContent>
+                </Dialog>
+              </div>
+            )}
           </>
         )}
       </div>
