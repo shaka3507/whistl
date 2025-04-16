@@ -1,28 +1,37 @@
 {
   "title": "Family Emergency Plan: Your Safety Blueprint",
-  "description": "Learn about family emergency plan: your safety blueprint. This is a placeholder description.",
+  "description": "Learn how to create a comprehensive family emergency plan to ensure safety and preparedness during disasters.",
+  "is_module": true,
   "sections": [
     {
-      "title": "Before",
-      "content": "## Preparation\n\nThis is placeholder content. You should replace this with real content about preparation steps.\n\n- Step 1\n- Step 2\n- Step 3"
+      "title": "Before an Emergency",
+      "content": "## Risk Planning\n\n- Identify hazards that could happen in your area and plan for unique actions for each.\n- Work with local emergency management to understand local plans and recommendations.\n\n## Needs of Specific Family Members\n\n- Create networks of neighbors, relatives, and friends to assist each other in emergencies.\n- Discuss needs and responsibilities, including care for children, pets, and those with specific needs.\n\n## Plan for Locations\n\n- Have plans and supplies for locations you and your household frequent.\n- Customize personal and household plans based on potential emergencies at these locations."
     },
     {
-      "title": "During",
-      "content": "## Immediate Actions\n\nThis is placeholder content. You should replace this with real content about what to do during this event.\n\n- Action 1\n- Action 2\n- Action 3"
+      "title": "During an Emergency",
+      "content": "## Communication Plan\n\n- Ensure all family members know how to contact each other during an emergency.\n- Designate a safe meeting place if separated.\n\n## Immediate Actions\n\n- Follow local emergency management instructions.\n- Use your emergency supplies and stay informed through local news and alerts."
     },
     {
-      "title": "After",
-      "content": "## Recovery\n\nThis is placeholder content. You should replace this with real content about recovery steps.\n\n- Recovery step 1\n- Recovery step 2\n- Recovery step 3"
+      "title": "After an Emergency",
+      "content": "## Recovery Steps\n\n- Assess the safety of your home before re-entering.\n- Communicate with family members to ensure everyone's safety.\n- Follow local guidance for recovery and rebuilding efforts."
     }
   ],
   "resources": [
     {
-      "title": "FEMA Website",
-      "url": "https://www.ready.gov/"
+      "title": "FEMA Family Emergency Plan",
+      "url": "https://www.ready.gov/sites/default/files/FamEmePlan%5F2012.pdf"
     },
     {
-      "title": "Red Cross Resources",
-      "url": "https://www.redcross.org/"
+      "title": "Ready.gov - Plan for Your Risks",
+      "url": "https://www.ready.gov/plan-for-your-risks"
+    },
+    {
+      "title": "Ready.gov - Considerations for Specific Needs",
+      "url": "https://www.ready.gov/considerations"
+    },
+    {
+      "title": "Ready.gov - Plan for Locations",
+      "url": "https://www.ready.gov/plan-for-locations"
     }
   ]
 }

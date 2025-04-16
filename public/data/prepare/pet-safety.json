@@ -1,18 +1,18 @@
 {
   "title": "Pet Emergency Preparedness: Keep Your Furry Friends Safe",
-  "description": "Learn about pet emergency preparedness: keep your furry friends safe. This is a placeholder description.",
+  "description": "Learn how to prepare your pets for emergencies, ensure their safety during disasters, and help them recover afterward.",
   "sections": [
     {
-      "title": "Before",
-      "content": "## Preparation\n\nThis is placeholder content. You should replace this with real content about preparation steps.\n\n- Step 1\n- Step 2\n- Step 3"
+      "title": "Before an Emergency",
+      "content": "## Preparation\n\n- **Emergency Kit for Pets**: Include sturdy leashes, harnesses, carriers, food, water, bowls, medications, medical records, first aid kit, and current photos of your pets.\n- **Evacuation Plan**: Know which hotels and shelters accept pets. Prepare a list of friends, relatives, or facilities that can care for your pets.\n- **Identification and Microchipping**: Ensure pets have up-to-date identification and consider microchipping.\n- **Vaccinations**: Keep vaccinations current and have proof ready, as many shelters require it."
     },
     {
-      "title": "During",
-      "content": "## Immediate Actions\n\nThis is placeholder content. You should replace this with real content about what to do during this event.\n\n- Action 1\n- Action 2\n- Action 3"
+      "title": "During an Emergency",
+      "content": "## Immediate Actions\n\n- **Evacuate with Pets**: If it's not safe for you, it's not safe for them. Evacuate pets with you.\n- **Safe Transport**: Use carriers and leashes to transport pets safely.\n- **Stay Informed**: Follow local emergency instructions and updates.\n- **Pet Comfort**: Keep pets calm and comfortable during transport and sheltering."
     },
     {
-      "title": "After",
-      "content": "## Recovery\n\nThis is placeholder content. You should replace this with real content about recovery steps.\n\n- Recovery step 1\n- Recovery step 2\n- Recovery step 3"
+      "title": "After an Emergency",
+      "content": "## Recovery\n\n- **Behavior Monitoring**: Pets may become disoriented or aggressive. Monitor their behavior closely.\n- **Safety Checks**: Be aware of hazards like debris and chemicals at pet level.\n- **Re-establish Routine**: Help pets return to normalcy by re-establishing routines and providing comfort.\n- **Consult a Veterinarian**: If behavior problems persist, seek professional advice."
     }
   ],
   "resources": [
@@ -21,8 +21,8 @@
       "url": "https://www.ready.gov/"
     },
     {
-      "title": "Red Cross Resources",
-      "url": "https://www.redcross.org/"
+      "title": "Red Cross Pet Disaster Preparedness",
+      "url": "https://www.redcross.org/get-help/how-to-prepare-for-emergencies/pet-disaster-preparedness.html"
     }
   ]
 }

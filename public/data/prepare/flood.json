@@ -1,18 +1,18 @@
 {
   "title": "Flood Survival: Rising Waters, Rising Awareness",
-  "description": "Learn about flood survival: rising waters, rising awareness. This is a placeholder description.",
+  "description": "Learn how to prepare for, survive during, and recover after a flood to ensure your safety and well-being.",
   "sections": [
     {
-      "title": "Before",
-      "content": "## Preparation\n\nThis is placeholder content. You should replace this with real content about preparation steps.\n\n- Step 1\n- Step 2\n- Step 3"
+      "title": "Before a Flood",
+      "content": "## Preparation\n\n- **Know Your Risk for Floods**: Visit FEMA's Flood Map Service Center to understand flood risks in your area. Sign up for community warning systems.\n- **Purchase Flood Insurance**: Ensure you have flood insurance, as homeowner's policies do not cover flooding. It takes up to 30 days for a policy to become effective.\n- **Prepare an Emergency Kit**: Include non-perishable foods, water, and other essentials for several days.\n- **Protect Important Documents**: Keep them in a waterproof container and create password-protected digital copies.\n- **Property Protection**: Move valuables to higher levels, declutter drains and gutters, and consider installing check valves and a sump pump with a battery."
     },
     {
-      "title": "During",
-      "content": "## Immediate Actions\n\nThis is placeholder content. You should replace this with real content about what to do during this event.\n\n- Action 1\n- Action 2\n- Action 3"
+      "title": "During a Flood",
+      "content": "## Immediate Actions\n\n- **Evacuate Immediately**: If instructed, evacuate without delay. Never drive around barricades.\n- **Avoid Flood Waters**: Do not walk, swim, or drive through flood waters. \"Turn Around, Don't Drown!\"\n- **Stay Informed**: Listen to EAS, NOAA Weather Radio, or local alerting systems for current emergency information.\n- **Safety in Vehicles**: If trapped in a car, stay inside. If water is rising, get on the roof.\n- **Seek Higher Ground**: If trapped in a building, move to the highest level. Signal for help if necessary."
     },
     {
-      "title": "After",
-      "content": "## Recovery\n\nThis is placeholder content. You should replace this with real content about recovery steps.\n\n- Recovery step 1\n- Recovery step 2\n- Recovery step 3"
+      "title": "After a Flood",
+      "content": "## Recovery\n\n- **Follow Authorities' Instructions**: Return home only when it is declared safe.\n- **Avoid Driving**: Only drive in emergencies.\n- **Safety During Cleanup**: Wear protective clothing during cleanup and avoid wading in floodwater.\n- **Health Precautions**: Avoid entering buildings with mold or water leaks if you have asthma or other lung conditions.\n- **Electrical Safety**: Do not touch electrical equipment if it is wet or if you are standing in water. Turn off electricity if safe to do so."
     }
   ],
   "resources": [
@@ -21,8 +21,8 @@
       "url": "https://www.ready.gov/"
     },
     {
-      "title": "Red Cross Resources",
-      "url": "https://www.redcross.org/"
+      "title": "Ready.gov - Floods",
+      "url": "https://www.ready.gov/floods"
     }
   ]
 }

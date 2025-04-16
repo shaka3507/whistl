@@ -35,7 +35,6 @@ export default function PreparePage() {
     { id: "heatwave", is_module: true, title: "Heat Wave Safety: Cool Tips for Hot Days", href: "/prepare/heatwave" },
     { id: "thunderstorm", title: "Thunderstorm Safety: Weather the Storm", href: "/prepare/thunderstorm" },
     { id: "earthquake", title: "Earthquake Preparedness: Shake, Rattle & Ready", href: "/prepare/earthquake" },
-    { id: "tsunami", title: "Tsunami Preparedness: Wave of Awareness", href: "/prepare/tsunami" },
     { id: "family-plan", title: "Family Emergency Plan: Your Safety Blueprint", href: "/prepare/family-plan" },
     { id: "pet-safety", title: "Pet Emergency Preparedness: Keep Your Furry Friends Safe", href: "/prepare/pet-safety" }
   ]

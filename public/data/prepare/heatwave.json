@@ -1,18 +1,18 @@
 {
   "title": "Heat Wave Safety: Cool Tips for Hot Days",
-  "description": "Learn about heat wave safety: cool tips for hot days. This is a placeholder description.",
+  "description": "Learn how to prepare for, stay safe during, and recover from extreme heat to ensure your health and well-being.",
   "sections": [
     {
-      "title": "Before",
-      "content": "## Preparation\n\nThis is placeholder content. You should replace this with real content about preparation steps.\n\n- Step 1\n- Step 2\n- Step 3"
+      "title": "Before a Heat Wave",
+      "content": "## Preparation\n\n- **Recognize Heat Illness Signs**: Learn to identify symptoms of heat-related illnesses.\n- **Cooling Options**: Identify places in your community to stay cool, such as libraries and malls.\n- **Home Preparation**: Cover windows with drapes, weather-strip doors, use window reflectors, and add insulation.\n- **Cooling Devices**: Install window air conditioners and insulate around them. Use attic fans to regulate heat.\n- **Financial Assistance**: Contact LIHEAP for help with cooling costs if needed."
     },
     {
-      "title": "During",
-      "content": "## Immediate Actions\n\nThis is placeholder content. You should replace this with real content about what to do during this event.\n\n- Action 1\n- Action 2\n- Action 3"
+      "title": "During a Heat Wave",
+      "content": "## Immediate Actions\n\n- **Stay Cool**: Never leave people or pets in a closed car. Find cooling options if air conditioning is unavailable.\n- **Hydration and Clothing**: Drink plenty of fluids and wear loose, lightweight, light-colored clothing.\n- **Outdoor Safety**: Avoid high-energy activities during midday heat. Find shade and wear a wide-brimmed hat.\n- **Community Check**: Check on family members, older adults, and neighbors.\n- **Pet Safety**: Ensure pets have cool water and shade. Avoid hot pavements.\n- **Power Outages**: Be prepared for potential power outages."
     },
     {
-      "title": "After",
-      "content": "## Recovery\n\nThis is placeholder content. You should replace this with real content about recovery steps.\n\n- Recovery step 1\n- Recovery step 2\n- Recovery step 3"
+      "title": "Heat-Related Illnesses",
+      "content": "## Recognizing and Responding\n\n- **Heat Stroke**: Extremely high body temperature, red and dry skin, rapid pulse, dizziness. Call 9-1-1 immediately.\n- **Heat Cramps**: Muscle pains or spasms in the stomach, arms, or legs.\n- **Heat Exhaustion**: Heavy sweating, paleness, muscle cramps, tiredness, dizziness, headache, nausea. Move to a cooler location and hydrate."
     }
   ],
   "resources": [
@@ -23,6 +23,10 @@
     {
       "title": "Red Cross Resources",
       "url": "https://www.redcross.org/"
+    },
+    {
+      "title": "Ready.gov - Extreme Heat",
+      "url": "https://www.ready.gov/heat"
     }
   ]
 }

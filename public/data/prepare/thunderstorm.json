@@ -1,18 +1,18 @@
 {
   "title": "Thunderstorm Safety: Weather the Storm",
-  "description": "Learn about thunderstorm safety: weather the storm. This is a placeholder description.",
+  "description": "Learn how to prepare for, stay safe during, and recover from thunderstorms to ensure your safety and well-being.",
   "sections": [
     {
-      "title": "Before",
-      "content": "## Preparation\n\nThis is placeholder content. You should replace this with real content about preparation steps.\n\n- Step 1\n- Step 2\n- Step 3"
+      "title": "Before a Thunderstorm",
+      "content": "## Preparation\n\n- **Identify a Sturdy Building**: Plan to shelter in a basement or a small, interior, windowless room on the lowest level.\n- **Practice Drills**: Conduct drills with your household to ensure everyone knows where to go and what to do.\n- **Stay Connected**: Sign up for emergency alerts and have a battery-powered radio.\n- **Learn Emergency Skills**: Learn First Aid and CPR.\n- **Protect Your Home**: Secure outdoor items, trim trees, and clean gutters. Consider installing a sump pump if your home is prone to flooding."
     },
     {
-      "title": "During",
-      "content": "## Immediate Actions\n\nThis is placeholder content. You should replace this with real content about what to do during this event.\n\n- Action 1\n- Action 2\n- Action 3"
+      "title": "During a Thunderstorm",
+      "content": "## Immediate Actions\n\n- **Seek Shelter**: When you hear thunder, go indoors immediately and stay away from windows and doors.\n- **Avoid Electrical Devices**: Do not use devices connected to electrical outlets.\n- **Avoid Water**: Lightning can travel through plumbing.\n- **Stay Informed**: Monitor weather alerts and updates.\n- **Vehicle Safety**: If caught outside, move to a safe shelter. If driving, pull off the road in a safe location."
     },
     {
-      "title": "After",
-      "content": "## Recovery\n\nThis is placeholder content. You should replace this with real content about recovery steps.\n\n- Recovery step 1\n- Recovery step 2\n- Recovery step 3"
+      "title": "After a Thunderstorm",
+      "content": "## Recovery\n\n- **Avoid Fallen Power Lines**: Report them to the utility company immediately.\n- **Expect Power Outages**: Use battery-powered lights and avoid candles.\n- **Prevent Carbon Monoxide Poisoning**: Use generators and grills outdoors and away from windows.\n- **Food Safety**: Discard food that got wet or warm."
     }
   ],
   "resources": [
@@ -21,8 +21,8 @@
       "url": "https://www.ready.gov/"
     },
     {
-      "title": "Red Cross Resources",
-      "url": "https://www.redcross.org/"
+      "title": "Red Cross Thunderstorm Safety",
+      "url": "https://www.redcross.org/get-help/how-to-prepare-for-emergencies/types-of-emergencies/thunderstorm.html"
     }
   ]
 }
