@@ -1,33 +1,38 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import { Header } from "@/components/header"
 import { Card, CardContent, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
-import { Search } from "lucide-react"
+import { Search, CheckCircle } from "lucide-react"
 import Link from "next/link"
 import { ChatAgent } from "@/components/chat-agent"
 import { FloatingChatButton } from "@/components/floating-chat-button"
+import { useParams } from "next/navigation"
+import { supabase } from "@/lib/supabase"
 
 // Card data structure
 interface CardData {
   id: string
   title: string
   href: string
+  is_module?: boolean
 }
 
 export default function PreparePage() {
+  const { slug } = useParams()
   const [searchTerm, setSearchTerm] = useState("")
-  
+  const [completedModules, setCompletedModules] = useState<Set<string>>(new Set())
+
   // All cards data
   const allCards: CardData[] = [
-    { id: "kit", title: "Emergency Kit Essentials: Your Lifeline in Crisis", href: "/prepare/emergency-kit" },
-    { id: "hurricane", title: "Hurricane Preparedness: Before, During & After", href: "/prepare/hurricane" },
-    { id: "tornado", title: "Tornado Safety: Your Quick-Action Guide", href: "/prepare/tornado" },
+    { id: "emergency-kit", is_module: true, title: "Emergency Kit Essentials: Your Lifeline in Crisis", href: "/prepare/emergency-kit" },
+    { id: "hurricane", is_module: true, title: "Hurricane Preparedness: Before, During & After", href: "/prepare/hurricane" },
+    { id: "tornado", is_module: true, title: "Tornado Safety: Your Quick-Action Guide", href: "/prepare/tornado" },
     { id: "flood", title: "Flood Survival: Rising Waters, Rising Awareness", href: "/prepare/flood" },
-    { id: "wildfire", title: "Wildfire Preparedness: Stay Safe in the Heat", href: "/prepare/wildfire" },
-    { id: "winter", title: "Winter Storm Survival: Beat the Freeze", href: "/prepare/winter-storm" },
-    { id: "heatwave", title: "Heat Wave Safety: Cool Tips for Hot Days", href: "/prepare/heatwave" },
+    { id: "wildfire", is_module: true, title: "Wildfire Preparedness: Stay Safe in the Heat", href: "/prepare/wildfire" },
+    { id: "winter", is_module: true, title: "Winter Storm Survival: Beat the Freeze", href: "/prepare/winter-storm" },
+    { id: "heatwave", is_module: true, title: "Heat Wave Safety: Cool Tips for Hot Days", href: "/prepare/heatwave" },
     { id: "thunderstorm", title: "Thunderstorm Safety: Weather the Storm", href: "/prepare/thunderstorm" },
     { id: "earthquake", title: "Earthquake Preparedness: Shake, Rattle & Ready", href: "/prepare/earthquake" },
     { id: "tsunami", title: "Tsunami Preparedness: Wave of Awareness", href: "/prepare/tsunami" },
@@ -50,7 +55,37 @@ export default function PreparePage() {
   
   // Second row cards (remaining items)
   const secondRowCards = filteredCards.slice(4)
-  
+
+  useEffect(() => {
+    async function fetchCompletionStatuses() {
+      // Get the user ID from Supabase auth
+      const { data: { user } } = await supabase.auth.getUser()
+
+      if (!user) {
+        console.error('User not authenticated')
+        return
+      }
+
+      // Fetch completion statuses for all modules
+      const { data, error } = await supabase
+        .from('module_progress')
+        .select('module_name')
+        .eq('user_id', user.id)
+        .eq('completed', true)
+
+      if (error) {
+        console.error('Error fetching completion statuses:', error)
+        return
+      }
+
+      // Create a set of completed module IDs
+      const completedSet = new Set(data.map((entry: { module_name: string }) => entry.module_name))
+      setCompletedModules(completedSet)
+    }
+
+    fetchCompletionStatuses()
+  }, [])
+
   return (
     <div>
       <Header />
@@ -98,6 +133,12 @@ export default function PreparePage() {
                             ) : (
                               <CardTitle className="text-xl mb-2">{card.title}</CardTitle>
                             )}
+                            {card.is_module && completedModules.has(card.id) && (
+                              <div className="flex items-center text-green-500 mt-2">
+                                <CheckCircle className="mr-1" />
+                                <span>Completed</span>
+                              </div>
+                            )}
                           </CardContent>
                         </Card>
                       </Link>
@@ -127,6 +168,12 @@ export default function PreparePage() {
                               </>
                             ) : (
                               <CardTitle className="text-xl mb-2">{card.title}</CardTitle>
+                            )}
+                            {card.is_module && completedModules.has(card.id) && (
+                              <div className="flex items-center text-green-500 mt-2">
+                                <CheckCircle className="mr-1" />
+                                <span>Completed</span>
+                              </div>
                             )}
                           </CardContent>
                         </Card>
