@@ -271,47 +271,54 @@ export default function ChannelPage() {
   };
 
   const handleInviteUser = async (e: React.FormEvent) => {
+    console.log("handleInviteUser");
     e.preventDefault();
     if (!inviteEmail.trim() || !user || !channel || !isAdmin) return;
 
     try {
       setIsSending(true);
-      const response = await fetch("/api/send-invite", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          email: inviteEmail,
-          channel,
-        }),
-      });
 
-      const data = await response.json();
+      // Fetch the user by email
+      const { data: userData, error: userError } = await supabase
+        .from("profiles")
+        .select("id")
+        .eq("email", inviteEmail)
+        .single();
 
-      if (!response.ok) {
-        throw new Error(data.error || "Failed to invite user");
+      if (userError || !userData) {
+        throw new Error("User not found");
       }
+
+      // Add the user to the channel
+      const { error: memberError } = await supabase
+        .from("channel_members")
+        .insert({
+          channel_id: channel.id,
+          user_id: userData.id,
+          role: "member", // or any appropriate role
+        });
+
+      if (memberError) {
+        throw new Error("Failed to add user to the channel");
+      }
+
+      // Send a notification message to the channel about the addition
+      await supabase.from("messages").insert({
+        channel_id: channel.id,
+        user_id: user.id,
+        content: `User with email ${inviteEmail} has been added to the channel.`,
+        is_notification: false,
+      });
 
       // Success - show message and clear the input
       setError(null);
       setInviteEmail("");
 
-      // Add a success notification message in the UI instead of using alert()
-      const successMessage =
-        data.message || `Invitation sent to ${inviteEmail}`;
-      console.log(successMessage); // Log for debugging
-
-      // Send a notification message to the channel about the invitation
-      await supabase.from("messages").insert({
-        channel_id: channel.id,
-        user_id: user.id,
-        content: `Invitation sent to ${inviteEmail}`,
-        is_notification: true,
-      });
+      // Log success message
+      console.log(`User with email ${inviteEmail} has been added to the channel.`);
     } catch (err: any) {
       console.error("Error inviting user:", err);
-      setError(err.message || "Failed to invite user");
+      setError(err.message || "Failed to add user to the channel");
     } finally {
       setIsSending(false);
     }
