@@ -49,11 +49,20 @@ export default function PreparePage() {
     )
   }, [searchTerm, allCards])
   
-  // First row cards (first 4 items or less if filtered)
-  const firstRowCards = filteredCards.slice(0, 4)
-  
-  // Second row cards (remaining items)
-  const secondRowCards = filteredCards.slice(4)
+  // Filter cards based on search term and is_module
+  const moduleCards = useMemo(() => {
+    return filteredCards.filter(card => card.is_module)
+  }, [filteredCards])
+
+  const nonModuleCards = useMemo(() => {
+    return filteredCards.filter(card => !card.is_module)
+  }, [filteredCards])
+
+  // First row cards (modules)
+  const firstRowCards = moduleCards
+
+  // Second row cards (non-modules)
+  const secondRowCards = nonModuleCards
 
   useEffect(() => {
     async function fetchCompletionStatuses() {
@@ -114,6 +123,8 @@ export default function PreparePage() {
             {/* First row - horizontally scrollable */}
             {firstRowCards.length > 0 && (
               <div className="mb-6 sm:px-4 md:px-4 lg:px-0">
+                <h2 className="text-2xl font-bold mb-4">Prepare and Test</h2>
+                <h3 className="text-lg font-medium text-gray-500 mb-4">Complete the following modules to test your knowledge.</h3>
                 <div className="flex overflow-x-auto pb-4 snap-x snap-mandatory -mx-4 px-4">
                   <div className="flex gap-4">
                     {firstRowCards.map(card => (
@@ -142,14 +153,21 @@ export default function PreparePage() {
                         </Card>
                       </Link>
                     ))}
+                    {/* Ensure the chat agent button is in the same row */}
+                    <div className="flex-shrink-0 w-[280px] snap-start">
+                      <Link href="/chat-agent" className="bg-blue-500 text-white px-6 py-3 text-lg rounded-full shadow-lg hover:bg-blue-600 transition">
+                        Ask our whist.AI chat assistant
+                      </Link>
+                    </div>
                   </div>
                 </div>
               </div>
             )}
             
-            {/* Second row - horizontally scrollable */}
+            {/* Second row - Learn section */}
             {secondRowCards.length > 0 && (
               <div className="px-4">
+                <h2 className="text-2xl font-bold mb-4">Learn</h2>
                 <div className="flex overflow-x-auto pb-4 snap-x snap-mandatory -mx-4 px-4">
                   <div className="flex gap-4">
                     {secondRowCards.map(card => (
@@ -168,12 +186,6 @@ export default function PreparePage() {
                             ) : (
                               <CardTitle className="text-xl mb-2">{card.title}</CardTitle>
                             )}
-                            {card.is_module && completedModules.has(card.id) && (
-                              <div className="flex items-center text-green-500 mt-2">
-                                <CheckCircle className="mr-1" />
-                                <span>Completed</span>
-                              </div>
-                            )}
                           </CardContent>
                         </Card>
                       </Link>
@@ -184,17 +196,20 @@ export default function PreparePage() {
             )}
           </>
         )}
-
-        {/* Desktop Chat Agent Section */}
-        <div className="hidden md:block mt-12">
-          <h2 className="text-2xl font-semibold mb-4">Ask our whist.AI chat assistant</h2>
-          <p className="text-gray-500 mb-4">Get instant answers about weather and crisis preparedness.</p>
-          <ChatAgent />
-        </div>
       </div>
 
       {/* Mobile Floating Chat Button */}
       <FloatingChatButton />
+
+      {/* Add a new hovering button for the chat agent */}
+      <div className="hidden md:block fixed bottom-4 right-4">
+        <Link href="/chat-agent" className="bg-blue-500 text-white w-16 h-16 flex items-center justify-center rounded-full shadow-lg hover:bg-blue-600 transition">
+          <span className="sr-only">Ask our whist.AI chat assistant</span>
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor" className="w-8 h-8">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M9 16h6M21 12c0 4.418-3.582 8-8 8a7.963 7.963 0 01-4.9-1.7L3 21l1.7-5.1A7.963 7.963 0 013 12c0-4.418 3.582-8 8-8s8 3.582 8 8z" />
+          </svg>
+        </Link>
+      </div>
     </div>
   )
 } 

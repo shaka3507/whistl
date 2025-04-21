@@ -217,6 +217,7 @@ export default function ChannelPage() {
       alert &&
       !alertAcknowledged
     ) {
+      console.log("acknowledge");
       await acknowledgeAlert();
       setNewMessage("");
       return;
@@ -453,24 +454,88 @@ export default function ChannelPage() {
     fetchSupplyItems();
   }, [alert, supabase]);
 
-  const claimSupplyItem = (itemId: string) => {
-    setClaimedItems(prev => {
-      const currentClaimed = prev[itemId] || 0;
-      const item = supplyItems.find(item => item.id === itemId);
-      
-      if (!item || currentClaimed >= item.quantity) return prev;
-      
-      return {
-        ...prev,
-        [itemId]: currentClaimed + 1
-      };
-    });
+  const claimSupplyItem = async (itemId: string) => {
+    const item = supplyItems.find(item => item.id === itemId);
+    if (!item) return;
+
+    const currentClaimed = claimedItems[itemId] || 0;
+    if (currentClaimed >= item.quantity) return;
+
+    try {
+      const claimedQuantity = currentClaimed + 1;
+      const response = await fetch('/api/claim-item', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ itemId, userId: user?.id, claimedQuantity }),
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        setClaimedItems(prev => ({
+          ...prev,
+          [itemId]: claimedQuantity
+        }));
+      } else {
+        console.error("Failed to claim item:", data.error);
+      }
+    } catch (error) {
+      console.error("Error claiming item:", error);
+    }
   };
 
   const getRemainingQuantity = (item: AlertPreparationItem) => {
     const claimed = claimedItems[item.id] || 0;
     return item.quantity - claimed;
   };
+
+  const acknowledgeMessage = async (messageId: string) => {
+    try {
+      console.log("Acknowledging message with ID:", messageId);
+      const response = await fetch('/api/acknowledge', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ messageId }),
+      });
+      const data = await response.json();
+      console.log("Acknowledgment response:", data);
+    } catch (error) {
+      console.error("Error acknowledging message:", error);
+    }
+  };
+
+  useEffect(() => {
+    const fetchClaimedItems = async () => {
+      if (!alert) return;
+
+      try {
+        const { data, error } = await supabase
+          .from("claimed_supply_items")
+          .select("*")
+          .eq("alert_id", alert.id);
+
+        if (error) {
+          console.error("Error fetching claimed items:", error);
+          return;
+        }
+
+        // Map claimed items to a dictionary for easy access
+        const claimedItemsMap = data.reduce((acc, item) => {
+          acc[item.item_id] = item.claimed_quantity;
+          return acc;
+        }, {});
+
+        setClaimedItems(claimedItemsMap);
+      } catch (err) {
+        console.error("Error in fetchClaimedItems:", err);
+      }
+    };
+
+    fetchClaimedItems();
+  }, [alert]);
 
   if (isLoading) {
     return (
@@ -610,16 +675,16 @@ export default function ChannelPage() {
                         </div>
                         <div className="divide-y">
                           {supplyItems.map((item) => {
-                            const remainingQuantity = getRemainingQuantity(item);
+                            const remainingQuantity = item.quantity - (claimedItems[item.id] || 0);
                             return (
                               <div key={item.id} className="grid grid-cols-2 gap-4 py-4 items-center">
                                 <div className="font-medium text-base">{item.name}</div>
                                 <div className="text-base">
                                   {remainingQuantity > 0 ? (
-                                    <Button 
-                                      size="sm" 
+                                    <Button
+                                      size="sm"
                                       onClick={() => claimSupplyItem(item.id)}
-                                      disabled={isAdmin} // Admins can't claim
+                                      disabled={isAdmin || remainingQuantity <= 0} // Disable if no items left
                                       className="w-full sm:w-auto"
                                     >
                                       Claim ({remainingQuantity} left)
