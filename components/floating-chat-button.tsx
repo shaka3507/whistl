@@ -12,7 +12,7 @@ function FloatingChatButtonComponent() {
   return (
     <>
       {/* Mobile Floating Button */}
-      <div className="fixed top-20 right-4 md:hidden">
+      <div className="fixed top-20 right-4 ">
         <Button
           size="icon"
           className="h-16 w-16 rounded-full shadow-lg"

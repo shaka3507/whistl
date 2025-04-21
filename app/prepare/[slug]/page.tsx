@@ -15,6 +15,7 @@ import {
   ExternalLink,
   ChevronDown,
   Search,
+  CheckCircle,
 } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
@@ -87,8 +88,10 @@ export default function PreparePage() {
     correctAnswers: 0,
     totalQuestions: 0,
     percentageCorrect: 0,
+    incorrectQuestions: [] as { question: string }[],
   });
   const [isQuizCompleted, setIsQuizCompleted] = useState(false);
+  const [isModuleCompleted, setIsModuleCompleted] = useState(false);
 
   const handleOptionSelect = (option: string) => {
     setSelectedOptions({ ...selectedOptions, [currentQuestion]: option });
@@ -105,11 +108,18 @@ export default function PreparePage() {
       const totalQuestions = quizQuestions?.length || 1;
       const percentageCorrect = (correctAnswers / totalQuestions) * 100;
 
+      // Identify incorrect questions
+      const incorrectQuestions =
+        quizQuestions?.filter(
+          (q, index) => q.answer !== selectedOptions[index]
+        ) || [];
+
       // Display results in modal
       setQuizResults({
         correctAnswers,
         totalQuestions,
         percentageCorrect,
+        incorrectQuestions,
       });
       setIsQuizCompleted(true);
     }
@@ -126,17 +136,44 @@ export default function PreparePage() {
       return;
     }
 
-    // Save completion status to Supabase
     try {
-      const { error } = await supabase
+      // Check if there's already a progress entry
+      const { data, error } = await supabase
         .from("module_progress")
-        .insert([{ module_name: slug, user_id: user.id, completed: true }]);
+        .select("completed")
+        .eq("module_name", slug)
+        .eq("user_id", user.id)
+        .single();
 
-      if (error) {
+      if (error && error.code !== 'PGRST116') { // PGRST116: No rows found
         throw error;
       }
+
+      if (!data) {
+        // Insert a new row with completed set to false
+        const { error: insertError } = await supabase
+          .from("module_progress")
+          .insert([{ module_name: slug, user_id: user.id, completed: true }]);
+
+        if (insertError) {
+          throw insertError;
+        }
+      } else if (!data.completed) {
+        // Update the existing row to set completed to true
+        const { error: updateError } = await supabase
+          .from("module_progress")
+          .update({ completed: true })
+          .eq("module_name", slug)
+          .eq("user_id", user.id);
+
+        if (updateError) {
+          throw updateError;
+        }
+      }
+
       setIsQuizCompleted(true);
       setIsQuizOpen(false);
+      setIsModuleCompleted(true);
       console.log("Progress saved successfully");
     } catch (error) {
       setIsQuizCompleted(false);
@@ -204,6 +241,54 @@ export default function PreparePage() {
 
     if (slug) {
       fetchData();
+    }
+  }, [slug]);
+
+  useEffect(() => {
+    async function checkAndInsertProgress() {
+      // Get the user ID from Supabase auth
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!user) {
+        console.error("User not authenticated");
+        return;
+      }
+
+      try {
+        // Check if there's already a progress entry
+        const { data, error } = await supabase
+          .from("module_progress")
+          .select("completed")
+          .eq("module_name", slug)
+          .eq("user_id", user.id)
+          .single();
+
+        if (error && error.code !== 'PGRST116') { // PGRST116: No rows found
+          throw error;
+        }
+
+        if (!data) {
+          // Insert a new row with completed set to false
+          const { error: insertError } = await supabase
+            .from("module_progress")
+            .insert([{ module_name: slug, user_id: user.id, completed: true }]);
+
+          if (insertError) {
+            throw insertError;
+          }
+        } else {
+          // Update the isModuleCompleted state based on the fetched data
+          setIsModuleCompleted(data.completed);
+        }
+      } catch (error) {
+        console.error("Error checking or inserting progress:", error);
+      }
+    }
+
+    if (slug) {
+      checkAndInsertProgress();
     }
   }, [slug]);
 
@@ -317,6 +402,13 @@ export default function PreparePage() {
     console.log("Quiz Opened:", isQuizOpen);
   };
 
+  // Reset quiz state when 'Try Again' is clicked
+  const handleTryAgain = () => {
+    setIsQuizCompleted(false);
+    setCurrentQuestion(0);
+    setSelectedOptions({});
+  };
+
   // Loading state with black theme
   if (isLoading) {
     return (
@@ -428,6 +520,20 @@ export default function PreparePage() {
                   }}
                 >
                   {data.title.split(":")[1].trim()}
+                </p>
+              )}
+
+              {isModuleCompleted && (
+                  <p className="text-2xl text-green-500 mb-4">
+                    <CheckCircle className="inline-block w-6 h-6" /> Quiz
+                    Completed
+                  </p>
+    
+              )}
+
+              {isModuleCompleted === false && (
+                <p className="text-2xl text-yellow-500 mb-4">
+                  Continue Reviewing
                 </p>
               )}
 
@@ -673,7 +779,7 @@ export default function PreparePage() {
                       onClick={() => setIsQuizOpen(true)}
                       className="bg-blue-200 text-lg text-primary-foreground hover:bg-blue-900/90 hover:text-white w-full"
                     >
-                      Take Quiz
+                      {isModuleCompleted ? "Retake Quiz" : "Take Quiz"}
                     </Button>
                   </DialogTrigger>
                   <DialogContent className="w-screen max-w-full h-screen md:max-w-3xl md:h-auto m-0 p-0 text-white rounded-none md:rounded-2xl flex flex-col">
@@ -689,9 +795,23 @@ export default function PreparePage() {
                           {quizResults.totalQuestions} questions correct (
                           {quizResults.percentageCorrect.toFixed(2)}%)
                         </p>
+                        {quizResults.incorrectQuestions.length > 0 && (
+                          <div className="text-red-500 mb-4">
+                            <h3 className="text-lg font-bold">
+                              Incorrect Questions:
+                            </h3>
+                            <ul className="list-disc list-inside">
+                              {quizResults.incorrectQuestions.map(
+                                (q, index) => (
+                                  <li key={index}>{q.question}</li>
+                                )
+                              )}
+                            </ul>
+                          </div>
+                        )}
                         {quizResults.percentageCorrect < 100 ? (
                           <Button
-                            onClick={() => setIsQuizCompleted(false)}
+                            onClick={handleTryAgain}
                             className="bg-blue-500 text-white px-4 py-2 rounded-full"
                           >
                             Try Again
@@ -747,6 +867,11 @@ export default function PreparePage() {
                               const letter = String.fromCharCode(65 + i); // A, B, C, D
                               const isSelected =
                                 selectedOptions[currentQuestion] === option;
+                              const isIncorrect =
+                                isQuizCompleted &&
+                                selectedOptions[currentQuestion] === option &&
+                                option !==
+                                  quizQuestions[currentQuestion].answer;
 
                               return (
                                 <button
@@ -754,7 +879,9 @@ export default function PreparePage() {
                                   onClick={() => handleOptionSelect(option)}
                                   className={`flex items-center justify-center px-4 py-3 rounded-full font-semibold transition-all ${
                                     isSelected
-                                      ? "bg-yellow-400 text-black"
+                                      ? isIncorrect
+                                        ? "bg-red-500 text-white"
+                                        : "bg-yellow-400 text-black"
                                       : "bg-white text-black"
                                   }`}
                                 >
