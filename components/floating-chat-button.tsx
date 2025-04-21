@@ -2,7 +2,7 @@
 
 import { useState, memo } from "react"
 import { Button } from "@/components/ui/button"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Dialog, DialogContent,DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { MessageSquare } from "lucide-react"
 import { ChatAgent } from "./chat-agent"
 
@@ -26,7 +26,9 @@ function FloatingChatButtonComponent() {
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
         <DialogContent className="max-w-[100vw] h-[80vh] bottom-0">
           <DialogHeader>
-            <DialogTitle>whist.AI - ask crisis preparedness questions</DialogTitle>
+            <DialogTitle>whist.ai</DialogTitle>
+            <DialogDescription>Ask our chatbot more on how to prepare</DialogDescription>
+            <DialogDescription className="text-sm text-gray-500 underline">what sources do we use?</DialogDescription>
           </DialogHeader>
           <div className="flex-1 overflow-hidden">
             {isOpen && <ChatAgent />}
