@@ -19,6 +19,8 @@ import {
   MessageSquare,
   Send,
   Users,
+  BellRing,
+  BellOff
 } from "lucide-react";
 import {
   Dialog,
@@ -29,6 +31,11 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { 
+  isPushNotificationSupported,
+  getNotificationPermissionStatus,
+  subscribeToPushNotifications 
+} from '@/lib/pushNotifications';
 
 type Channel = Database["public"]["Tables"]["channels"]["Row"];
 type Alert = Database["public"]["Tables"]["alerts"]["Row"] & {
@@ -36,6 +43,7 @@ type Alert = Database["public"]["Tables"]["alerts"]["Row"] & {
 };
 type Message = Database["public"]["Tables"]["messages"]["Row"] & {
   profiles: Database["public"]["Tables"]["profiles"]["Row"];
+  notification_type?: "push" | "standard";
 };
 type ChannelMember = Database["public"]["Tables"]["channel_members"]["Row"] & {
   profiles: Database["public"]["Tables"]["profiles"]["Row"];
@@ -68,6 +76,7 @@ export default function ChannelPage() {
   const [userRole, setUserRole] = useState<"admin" | "member">("member");
   const [inviteEmail, setInviteEmail] = useState("");
   const [notificationText, setNotificationText] = useState("");
+  const [notificationType, setNotificationType] = useState<"push" | "standard">("push");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [alertAcknowledged, setAlertAcknowledged] = useState(false);
@@ -77,6 +86,8 @@ export default function ChannelPage() {
   >([]);
   const [supplyItems, setSupplyItems] = useState<AlertPreparationItem[]>([]);
   const [claimedItems, setClaimedItems] = useState<Record<string, number>>({});
+  const [pushNotificationEnabled, setPushNotificationEnabled] = useState<boolean>(false);
+  const [pushNotificationStatus, setPushNotificationStatus] = useState<string>('unchecked');
 
   useEffect(() => {
     const fetchChannelData = async () => {
@@ -155,6 +166,24 @@ export default function ChannelPage() {
           throw messagesError;
         }
 
+        // Get message dismissals for this user
+        const { data: dismissalsData, error: dismissalsError } = await supabase
+          .from("message_dismissals")
+          .select("message_id")
+          .eq("user_id", user.id);
+
+        if (dismissalsError) {
+          console.error("Error fetching dismissals:", dismissalsError);
+        }
+
+        // Create a set of dismissed message IDs for efficient lookup
+        const dismissedMessageIds = new Set(
+          (dismissalsData || []).map(dismissal => dismissal.message_id)
+        );
+
+        // Add to local dismissed notifications state
+        setDismissedNotifications(Array.from(dismissedMessageIds));
+
         setMessages(messagesData || []);
       } catch (err: any) {
         console.error("Error fetching channel data:", err);
@@ -190,7 +219,7 @@ export default function ChannelPage() {
             .eq("id", payload.new.id)
             .single();
 
-          if (data) {
+          if (data && !dismissedNotifications.includes(data.id)) {
             setMessages((prev) => [...prev, data]);
           }
         }
@@ -206,6 +235,19 @@ export default function ChannelPage() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  // Check push notification permission status
+  useEffect(() => {
+    const checkPushNotificationStatus = async () => {
+      if (!user) return;
+      
+      const status = await getNotificationPermissionStatus();
+      setPushNotificationStatus(status);
+      setPushNotificationEnabled(status === 'granted');
+    };
+    
+    checkPushNotificationStatus();
+  }, [user]);
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -251,15 +293,87 @@ export default function ChannelPage() {
 
     setIsSending(true);
     try {
-      const { error } = await supabase.from("messages").insert({
-        channel_id: channel.id,
-        user_id: user.id,
-        content: notificationText,
-        is_notification: true,
+      // Check if it's a push notification
+      const isPushNotification = notificationType === 'push';
+      
+      // Instead of inserting directly, use a server-side API to insert the message
+      // This lets us use admin privileges to bypass RLS
+      const messageResponse = await fetch('/api/create-notification', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          channelId: channel.id,
+          userId: user.id,
+          content: notificationText,
+          isNotification: true,
+          notificationType: notificationType,
+        }),
       });
+      
+      if (!messageResponse.ok) {
+        throw new Error(`Failed to create notification: ${await messageResponse.text()}`);
+      }
+      
+      const messageData = await messageResponse.json();
+      const newMessage = messageData.message;
 
-      if (error) {
-        throw error;
+      if (!newMessage) {
+        throw new Error('No message returned from create-notification API');
+      }
+
+      // If it's a push notification, send push notifications to all members
+      if (isPushNotification) {
+        console.log("Sending push notification");
+        
+        try {
+          // Call the Supabase Edge Function to send push notifications to all channel members
+          const response = await fetch('/api/send-push-notification', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              channelId: channel.id,
+              title: `${profile?.full_name || 'Admin'} sent a push notification`,
+              messageBody: notificationText,
+              url: `/channels/${channel.id}`
+            }),
+          });
+          
+          const result = await response.json();
+          console.log('Push notification result:', result);
+        } catch (pushError) {
+          console.error('Error sending push notification:', pushError);
+          // Continue execution even if push notification fails
+        }
+      }
+
+      // Auto-dismiss the notification for the admin who sent it
+      if (newMessage.id) {
+        try {
+          // Create a dismissal record through API endpoint to bypass RLS
+          const dismissResponse = await fetch('/api/dismiss-notification', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              messageId: newMessage.id,
+              userId: user.id,
+            }),
+          });
+          
+          if (!dismissResponse.ok) {
+            console.error('Failed to dismiss notification for admin:', await dismissResponse.text());
+          } else {
+            // Update local state to ensure immediate UI update
+            setDismissedNotifications(prev => [...prev, newMessage.id]);
+          }
+        } catch (dismissError) {
+          console.error('Error auto-dismissing notification:', dismissError);
+        }
       }
 
       setNotificationText("");
@@ -426,8 +540,29 @@ export default function ChannelPage() {
     checkAcknowledgment();
   }, [user, alert, supabase]);
 
-  const dismissNotification = (notificationId: string) => {
-    setDismissedNotifications((prev) => [...prev, notificationId]);
+  const dismissNotification = async (notificationId: string) => {
+    if (!user) return;
+    
+    try {
+      // Create a record of this user dismissing this notification
+      const { error } = await supabase
+        .from("message_dismissals")
+        .insert({
+          message_id: notificationId,
+          user_id: user.id,
+          dismissed_at: new Date().toISOString()
+        });
+      
+      if (error) {
+        console.error("Error recording notification dismissal:", error);
+        return;
+      }
+      
+      // Update local state for immediate UI updates
+      setDismissedNotifications((prev) => [...prev, notificationId]);
+    } catch (err) {
+      console.error("Error dismissing notification:", err);
+    }
   };
 
   useEffect(() => {
@@ -537,6 +672,27 @@ export default function ChannelPage() {
     fetchClaimedItems();
   }, [alert]);
 
+  // Function to request push notification permission
+  const requestPushNotificationPermission = async () => {
+    try {
+      if (!user) return;
+      
+      await subscribeToPushNotifications(user.id);
+      const status = await getNotificationPermissionStatus();
+      setPushNotificationStatus(status);
+      setPushNotificationEnabled(status === 'granted');
+      
+      if (status === 'granted') {
+        // Show a success message
+        setError('Push notifications enabled successfully!');
+        setTimeout(() => setError(null), 3000);
+      }
+    } catch (err) {
+      console.error('Error enabling push notifications:', err);
+      setError('Failed to enable push notifications. Please try again.');
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex min-h-screen flex-col">
@@ -589,6 +745,32 @@ export default function ChannelPage() {
               <h1 className="font-semibold text-base sm:text-lg truncate max-w-[120px] sm:max-w-none">{channel.name}</h1>
             </div>
             <div className="flex items-center gap-4">
+              {isPushNotificationSupported() && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={requestPushNotificationPermission}
+                  disabled={pushNotificationStatus === 'granted'}
+                  title={
+                    pushNotificationStatus === 'granted'
+                      ? 'Push notifications are enabled'
+                      : 'Enable push notifications'
+                  }
+                  className="text-xs"
+                >
+                  {pushNotificationStatus === 'granted' ? (
+                    <>
+                      <BellRing className="h-4 w-4 mr-1" />
+                      <span className="hidden sm:inline">Notifications Enabled</span>
+                    </>
+                  ) : (
+                    <>
+                      <BellOff className="h-4 w-4 mr-1" />
+                      <span className="hidden sm:inline">Enable Notifications</span>
+                    </>
+                  )}
+                </Button>
+              )}
               <Dialog>
                 <DialogTrigger asChild>
                   <Button
@@ -760,6 +942,7 @@ export default function ChannelPage() {
                 <div className="space-y-6">
                   {messages.map((message) => {
                     const isNotification = message.is_notification;
+                    const isPushNotification = message.notification_type === 'push';
                     const initials = message.profiles.full_name
                       ? message.profiles.full_name
                           .split(" ")
@@ -769,6 +952,7 @@ export default function ChannelPage() {
 
                     if (
                       isNotification &&
+                      isPushNotification &&
                       !dismissedNotifications.includes(message.id)
                     ) {
                       return (
@@ -778,8 +962,9 @@ export default function ChannelPage() {
                         >
                           <div className="bg-red-300 border rounded-lg p-4 mx-4 my-auto max-w-2xl shadow-lg w-full sm:w-auto">
                             <div className="flex items-center gap-2 mb-2">
+                              <Bell className="h-5 w-5" />
                               <span className="font-medium text-black">
-                                Notification from {message.profiles.full_name}
+                                PUSH NOTIFICATION from {message.profiles.full_name}
                               </span>
                             </div>
                             <p className="text-black">{message.content}</p>
@@ -793,6 +978,41 @@ export default function ChannelPage() {
                               >
                                 Acknowledge
                               </Button>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    }
+                    
+                    // Display standard notifications inline
+                    if (isNotification && !isPushNotification && !dismissedNotifications.includes(message.id)) {
+                      return (
+                        <div key={message.id} className="flex items-start gap-4 bg-amber-50 p-3 rounded-md">
+                          <Avatar className="h-10 w-10">
+                            <AvatarImage src={message.profiles.avatar_url || ""} />
+                            <AvatarFallback>{initials}</AvatarFallback>
+                          </Avatar>
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 justify-between">
+                              <div className="flex items-center gap-2">
+                                <div className="font-medium">
+                                  {message.profiles.full_name} <span className="text-xs text-muted-foreground">(Notification)</span>
+                                </div>
+                                <div className="text-xs text-muted-foreground">
+                                  {new Date(message.created_at).toLocaleString()}
+                                </div>
+                              </div>
+                              <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                onClick={() => dismissNotification(message.id)}
+                                className="h-7 px-2"
+                              >
+                                Dismiss
+                              </Button>
+                            </div>
+                            <div className="mt-1">
+                              <p>{message.content}</p>
                             </div>
                           </div>
                         </div>
@@ -881,8 +1101,33 @@ export default function ChannelPage() {
                   <TabsContent value="notification">
                     <form
                       onSubmit={handleSendNotification}
-                      className="flex gap-2"
+                      className="flex flex-col gap-2"
                     >
+                      <div className="flex items-center gap-4 mb-2">
+                        <div className="text-sm font-medium">Notification Type:</div>
+                        <div className="flex items-center gap-2">
+                          <label className="flex items-center gap-1">
+                            <input 
+                              type="radio" 
+                              name="notificationType" 
+                              value="push" 
+                              checked={notificationType === 'push'} 
+                              onChange={() => setNotificationType('push')}
+                            />
+                            <span>Push</span>
+                          </label>
+                          <label className="flex items-center gap-1">
+                            <input 
+                              type="radio" 
+                              name="notificationType" 
+                              value="standard" 
+                              checked={notificationType === 'standard'} 
+                              onChange={() => setNotificationType('standard')}
+                            />
+                            <span>Standard</span>
+                          </label>
+                        </div>
+                      </div>
                       <Textarea
                         placeholder="Type an important notification..."
                         value={notificationText}
