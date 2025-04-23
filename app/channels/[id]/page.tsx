@@ -36,6 +36,7 @@ import {
   getNotificationPermissionStatus,
   subscribeToPushNotifications 
 } from '@/lib/pushNotifications';
+import { Switch } from "@/components/ui/switch";
 
 type Channel = Database["public"]["Tables"]["channels"]["Row"];
 type Alert = Database["public"]["Tables"]["alerts"]["Row"] & {
@@ -1104,29 +1105,17 @@ export default function ChannelPage() {
                       className="flex flex-col gap-2"
                     >
                       <div className="flex items-center gap-4 mb-2">
-                        <div className="text-sm font-medium">Notification Type:</div>
-                        <div className="flex items-center gap-2">
-                          <label className="flex items-center gap-1">
-                            <input 
-                              type="radio" 
-                              name="notificationType" 
-                              value="push" 
-                              checked={notificationType === 'push'} 
-                              onChange={() => setNotificationType('push')}
-                            />
-                            <span>Push</span>
-                          </label>
-                          <label className="flex items-center gap-1">
-                            <input 
-                              type="radio" 
-                              name="notificationType" 
-                              value="standard" 
-                              checked={notificationType === 'standard'} 
-                              onChange={() => setNotificationType('standard')}
-                            />
-                            <span>Standard</span>
-                          </label>
-                        </div>
+                        <div className="text-sm font-medium">Push Notification:</div>
+                        <Switch
+                          id="notification-type-switch"
+                          checked={notificationType === 'push'}
+                          onCheckedChange={(checked) => 
+                            setNotificationType(checked ? 'push' : 'standard')
+                          }
+                        />
+                        <span className="text-sm text-muted-foreground">
+                          {notificationType === 'push' ? 'Push' : 'Standard'}
+                        </span>
                       </div>
                       <Textarea
                         placeholder="Type an important notification..."
@@ -1138,8 +1127,9 @@ export default function ChannelPage() {
                       <Button
                         type="submit"
                         disabled={isSending || !notificationText.trim()}
-                        className="h-10"
+                        className="h-10 w-fit ml-auto"
                       >
+                        Send {notificationType === 'push' ? 'Push' : 'Standard'} Notification
                         <Bell className="h-4 w-4" />
                       </Button>
                     </form>

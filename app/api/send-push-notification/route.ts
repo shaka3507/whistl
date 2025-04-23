@@ -1,5 +1,18 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import webpush from 'web-push';
+
+// VAPID keys for web push
+const VAPID_PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || 'BMR_S873mOj37k8T-je1GF-WDgvvnUfH7rfGslAJrZwEi1rF9NzP3HRuGQG07oLc7MRmZH8jF2p-kzpTPQeyF7Y';
+const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY || 'Ry5gvadVpruLlYXZedqtS55j5RyLR9BWuk1YCFw5kHM';
+const VAPID_EMAIL = process.env.VAPID_EMAIL || 'your-email@example.com';
+
+// Configure web-push with VAPID details
+webpush.setVapidDetails(
+  `mailto:${VAPID_EMAIL}`,
+  VAPID_PUBLIC_KEY,
+  VAPID_PRIVATE_KEY
+);
 
 export async function POST(request: Request) {
   try {
@@ -72,23 +85,42 @@ export async function POST(request: Request) {
       });
     }
 
-    // Here you would typically call a service like web-push to send the notifications
-    // For this implementation, we'll just simulate the sending process
+    console.log(`Sending push notification to ${subscriptions.length} subscriptions`);
     
-    // In a real implementation, you would:
-    // 1. Parse the subscription data for each user
-    // 2. Use web-push library to send notifications to each subscription
-    
-    // For now, we'll just log the intent and return success
-    console.log(`Would send push notification to ${subscriptions.length} subscriptions`);
-    console.log(`Title: ${title}`);
-    console.log(`Body: ${messageBody}`);
-    console.log(`URL: ${url || 'No URL provided'}`);
+    // Prepare the notification payload
+    const notificationPayload = JSON.stringify({
+      title: title,
+      body: messageBody,
+      url: url || '/',
+      tag: 'notification'
+    });
+
+    // Send notifications to all subscriptions
+    const results = await Promise.allSettled(
+      subscriptions.map(async (sub) => {
+        try {
+          const parsedSubscription = JSON.parse(sub.subscription);
+          await webpush.sendNotification(
+            parsedSubscription,
+            notificationPayload
+          );
+          return { success: true, userId: sub.user_id };
+        } catch (error) {
+          console.error('Error sending notification:', error);
+          return { success: false, error, userId: sub.user_id };
+        }
+      })
+    );
+
+    // Count successful and failed notifications
+    const successful = results.filter(r => r.status === 'fulfilled' && r.value.success).length;
+    const failed = results.length - successful;
 
     return NextResponse.json({
       success: true,
-      message: `Push notification sent to ${subscriptions.length} subscribers`,
-      sent: subscriptions.length,
+      message: `Push notification sent to ${successful} subscribers (${failed} failed)`,
+      sent: successful,
+      failed: failed,
       total: userIds.length
     });
   } catch (error: any) {
