@@ -20,7 +20,12 @@ import {
   Send,
   Users,
   BellRing,
-  BellOff
+  BellOff,
+  Package,
+  PackageOpen,
+  ArrowLeft,
+  Info,
+  AlertCircle
 } from "lucide-react";
 import {
   Dialog,
@@ -93,6 +98,16 @@ export default function ChannelPage() {
   const [serviceWorkerStatus, setServiceWorkerStatus] = useState<string>('Checking...');
   const [showDebugInfo, setShowDebugInfo] = useState<boolean>(false);
   const [debugInfo, setDebugInfo] = useState<Record<string, any>>({});
+  const [showSuppliesView, setShowSuppliesView] = useState<boolean>(false);
+  const [isLocalhost, setIsLocalhost] = useState<boolean>(false);
+
+  // Check if running on localhost
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const hostname = window.location.hostname;
+      setIsLocalhost(hostname === 'localhost' || hostname === '127.0.0.1');
+    }
+  }, []);
 
   // Format date as "time ago"
   const timeAgo = (dateString: string) => {
@@ -1007,35 +1022,21 @@ export default function ChannelPage() {
       <Header />
       <main className="flex-1 flex flex-col">
         <div className="border-b w-full">
-          <div className="container mx-auto flex items-center justify-between h-14 px-4">
-            <div className="flex items-center gap-2">
+          <div className="flex items-center justify-between h-14 px-2 sm:px-4 max-w-full overflow-hidden">
+            <div className="flex items-center gap-2 min-w-0">
               <h1 className="font-semibold text-base sm:text-lg truncate max-w-[120px] sm:max-w-none">{channel.name}</h1>
             </div>
-            <div className="flex items-center gap-4">
-              {isPushNotificationSupported() && (
+            <div className="flex items-center gap-1 sm:gap-3 overflow-x-auto flex-nowrap" style={{ 
+              msOverflowStyle: 'none' as const, 
+              scrollbarWidth: 'none' as const, 
+              WebkitOverflowScrolling: 'touch' as const 
+            }}>
+              {isLocalhost && isPushNotificationSupported() && (
                 <Dialog>
                   <DialogTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      title={
-                        pushNotificationStatus === 'granted'
-                          ? 'View notification status'
-                          : 'Enable push notifications'
-                      }
-                      className="text-xs"
-                    >
-                      {pushNotificationStatus === 'granted' ? (
-                        <>
-                          <BellRing className="h-4 w-4 mr-1" />
-                          <span className="hidden sm:inline">Notifications</span>
-                        </>
-                      ) : (
-                        <>
-                          <BellOff className="h-4 w-4 mr-1" />
-                          <span className="hidden sm:inline">Enable Notifications</span>
-                        </>
-                      )}
+                    <Button variant="outline" size="sm" className="flex-shrink-0 px-2 sm:px-3 rounded-full transition-colors hover:bg-blue-100 hover:text-blue-700 hover:border-blue-300 dark:hover:bg-blue-800/30 dark:hover:text-blue-400">
+                      <Bell className="h-4 w-4 sm:mr-1" />
+                      <span className="hidden sm:inline">Notifications</span>
                     </Button>
                   </DialogTrigger>
                   <DialogContent className="sm:max-w-md">
@@ -1160,18 +1161,21 @@ export default function ChannelPage() {
                   </DialogContent>
                 </Dialog>
               )}
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="flex-shrink-0 px-2 sm:px-3 rounded-full transition-colors hover:bg-green-100 hover:text-green-700 hover:border-green-300 dark:hover:bg-green-800/30 dark:hover:text-green-400"
+                onClick={() => setShowSuppliesView(true)}
+              >
+                <Package className="h-4 w-4 sm:mr-1" />
+                <span className="hidden sm:inline">Supplies</span>
+              </Button>
               <Dialog>
                 <DialogTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="flex items-center justify-between min-w-[150px]"
-                  >
-                    <div className="flex items-center">
-                      <Users className="h-4 w-4 mr-2" />
-                      <span className="hidden sm:inline">Members</span>
-                      <span className="ml-1">{members.length}</span>
-                    </div>
+                  <Button variant="outline" size="sm" className="flex-shrink-0 px-2 sm:px-3 rounded-full transition-colors hover:bg-purple-100 hover:text-purple-700 hover:border-purple-300 dark:hover:bg-purple-800/30 dark:hover:text-purple-400">
+                    <Users className="h-4 w-4 sm:mr-1" />
+                    <span className="hidden sm:inline">Members</span>
+                    <span className="ml-1">{members.length}</span>
                   </Button>
                 </DialogTrigger>
                 <DialogContent>
@@ -1224,64 +1228,12 @@ export default function ChannelPage() {
                   )}
                 </DialogContent>
               </Dialog>
-              <Dialog>
-                <DialogTrigger asChild>
-                  <Button variant="ghost" size="sm" className="flex items-center">
-                    <span className="sm:inline">Claim Supplies {">"}</span>
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="w-[95%] sm:w-[80%] md:w-[70%] lg:w-[60%] max-w-[800px] h-auto sm:h-[80vh] overflow-y-auto">
-                  <DialogHeader>
-                    <DialogTitle className="text-xl">Available Supplies</DialogTitle>
-                    <DialogDescription>
-                      Offered by group for group members.
-                    </DialogDescription>
-                  </DialogHeader>
-                  <div className="mt-4">
-                    {supplyItems.length > 0 ? (
-                      <div className="space-y-4">
-                        <div className="grid grid-cols-2 gap-4 font-medium text-sm mb-4 border-b pb-2">
-                          <div>Item</div>
-                          <div>Available</div>
-                        </div>
-                        <div className="divide-y">
-                          {supplyItems.map((item) => {
-                            const remainingQuantity = item.quantity - (claimedItems[item.id] || 0);
-                            return (
-                              <div key={item.id} className="grid grid-cols-2 gap-4 py-4 items-center">
-                                <div className="font-medium text-base">{item.name}</div>
-                                <div className="text-base">
-                                  {remainingQuantity > 0 ? (
-                                    <Button
-                                      size="sm"
-                                      onClick={() => claimSupplyItem(item.id)}
-                                      disabled={isAdmin || remainingQuantity <= 0} // Disable if no items left
-                                      className="w-full sm:w-auto"
-                                    >
-                                      Claim ({remainingQuantity} left)
-                                    </Button>
-                                  ) : (
-                                    <span className="text-muted-foreground text-sm">Out of stock</span>
-                                  )}
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="text-center py-8 text-muted-foreground">
-                        No supply items available for this alert
-                      </div>
-                    )}
-                  </div>
-                </DialogContent>
-              </Dialog>
               {alert && (
                 <Dialog>
                   <DialogTrigger asChild>
-                    <Button variant="ghost" size="sm" className="text-red-600">
-                      <span className="hidden sm:inline">Alert Info</span>
+                    <Button variant="outline" size="sm" className="flex-shrink-0 rounded-full transition-colors hover:bg-red-100 hover:text-red-700 hover:border-red-300 dark:hover:bg-red-800/30 dark:hover:text-red-400">
+                      <AlertCircle className="h-4 w-4 mr-1" />
+                      <span className="hidden sm:inline">Info</span>
                     </Button>
                   </DialogTrigger>
                   <DialogContent>
@@ -1319,7 +1271,80 @@ export default function ChannelPage() {
         <div className="flex-1 flex flex-col md:flex-row">
           <div className="flex-1 flex flex-col">
             <div className="flex-1 overflow-y-auto p-4">
-              {messages.length === 0 ? (
+              {/* Conditional rendering for chat or supplies view */}
+              {showSuppliesView ? (
+                <div className="flex-1 flex flex-col h-full">
+                  <div className="border-b py-2 px-4 flex items-center justify-between">
+                    <div className="flex items-center">
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="rounded-full hover:bg-amber-100 hover:text-amber-700 dark:hover:bg-amber-800/30 dark:hover:text-amber-400 mr-2 transition-colors"
+                        onClick={() => setShowSuppliesView(false)}
+                      >
+                        <ArrowLeft className="h-5 w-5" />
+                      </Button>
+                      <h2 className="font-semibold">Group Supplies</h2>
+                    </div>
+                  </div>
+                  
+                  <div className="overflow-y-auto flex-1 p-4">
+                    <div className="max-w-3xl mx-auto">
+                        
+                      {supplyItems.length > 0 ? (
+                        <div className="divide-y border rounded-md overflow-hidden">
+                          <div className="grid grid-cols-2 bg-muted/50 text-sm font-medium p-3">
+                            <div>Item</div>
+                            <div className="text-right">Availability</div>
+                          </div>
+                          
+                          {supplyItems.map((item) => {
+                            const remainingQuantity = item.quantity - (claimedItems[item.id] || 0);
+                            return (
+                              <div key={item.id} className="grid grid-cols-2 gap-2 p-3 items-center bg-card">
+                                <div>
+                                  <div className="font-medium">{item.name}</div>
+                                  <div className="text-md text-muted-foreground mt-1">
+                                    {remainingQuantity > 0 
+                                      ? `${remainingQuantity} of ${item.quantity} available` 
+                                      : 'None available'}
+                                  </div>
+                                </div>
+                                <div className="text-right">
+                                  {remainingQuantity > 0 ? (
+                                    <Button
+                                      onClick={() => claimSupplyItem(item.id)}
+                                      disabled={isAdmin || remainingQuantity <= 0}
+                                      size="sm"
+                                      className="rounded-full px-4"
+                                    >
+                                      Claim
+                                    </Button>
+                                  ) : (
+                                    <span className="text-muted-foreground text-sm bg-muted px-3 py-1 rounded-full inline-block">
+                                      Out of stock
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <div className="text-center py-12 border rounded-lg bg-muted/20">
+                          <div className="mb-2 text-muted-foreground">
+                            <PackageOpen className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                            No supplies currently available
+                          </div>
+                          <p className="text-sm text-muted-foreground">
+                            Check back later or contact an administrator
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ) : messages.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-full text-center p-4">
                   <MessageSquare className="h-12 w-12 text-muted-foreground mb-4" />
                   <h3 className="text-lg font-medium">No messages yet</h3>
@@ -1378,6 +1403,7 @@ export default function ChannelPage() {
                                   acknowledgeMessage(message.id);
                                   dismissNotification(message.id);
                                 }}
+                                className="rounded-full px-6"
                               >
                                 Acknowledge
                               </Button>
@@ -1408,7 +1434,7 @@ export default function ChannelPage() {
                                 variant="ghost" 
                                 size="sm" 
                                 onClick={() => dismissNotification(message.id)}
-                                className="h-6 px-2 text-xs"
+                                className="h-6 px-3 rounded-full text-xs"
                               >
                                 Dismiss
                               </Button>
