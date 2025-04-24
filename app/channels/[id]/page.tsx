@@ -29,6 +29,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
+  DialogFooter,
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
@@ -89,6 +90,58 @@ export default function ChannelPage() {
   const [claimedItems, setClaimedItems] = useState<Record<string, number>>({});
   const [pushNotificationEnabled, setPushNotificationEnabled] = useState<boolean>(false);
   const [pushNotificationStatus, setPushNotificationStatus] = useState<string>('unchecked');
+  const [serviceWorkerStatus, setServiceWorkerStatus] = useState<string>('Checking...');
+  const [showDebugInfo, setShowDebugInfo] = useState<boolean>(false);
+  const [debugInfo, setDebugInfo] = useState<Record<string, any>>({});
+
+  // Format date as "time ago"
+  const timeAgo = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const secondsAgo = Math.floor((now.getTime() - date.getTime()) / 1000);
+    
+    // Less than a minute
+    if (secondsAgo < 60) {
+      return 'just now';
+    }
+    
+    // Less than an hour
+    if (secondsAgo < 3600) {
+      const minutes = Math.floor(secondsAgo / 60);
+      return `${minutes} ${minutes === 1 ? 'minute' : 'minutes'} ago`;
+    }
+    
+    // Less than a day
+    if (secondsAgo < 86400) {
+      const hours = Math.floor(secondsAgo / 3600);
+      return `${hours} ${hours === 1 ? 'hour' : 'hours'} ago`;
+    }
+    
+    // Less than a week
+    if (secondsAgo < 604800) {
+      const days = Math.floor(secondsAgo / 86400);
+      if (days === 1) {
+        return 'yesterday';
+      }
+      return `${days} days ago`;
+    }
+    
+    // Less than a month
+    if (secondsAgo < 2592000) {
+      const weeks = Math.floor(secondsAgo / 604800);
+      return `${weeks} ${weeks === 1 ? 'week' : 'weeks'} ago`;
+    }
+    
+    // Less than a year
+    if (secondsAgo < 31536000) {
+      const months = Math.floor(secondsAgo / 2592000);
+      return `${months} ${months === 1 ? 'month' : 'months'} ago`;
+    }
+    
+    // More than a year
+    const years = Math.floor(secondsAgo / 31536000);
+    return `${years} ${years === 1 ? 'year' : 'years'} ago`;
+  };
 
   useEffect(() => {
     const fetchChannelData = async () => {
@@ -393,18 +446,124 @@ export default function ChannelPage() {
 
     try {
       setIsSending(true);
-
-      // Fetch the user by email
-      const { data: userData, error: userError } = await supabase
+      setError(null);
+      
+      // Normalize the email (trim and convert to lowercase)
+      const normalizedEmail = inviteEmail.trim().toLowerCase();
+      console.log("Looking up user with email:", normalizedEmail);
+      
+      // Try multiple approaches to find the user in profiles
+      
+      // Approach 1: Exact match with email
+      let { data: userData, error: userError } = await supabase
         .from("profiles")
-        .select("id")
-        .eq("email", inviteEmail)
-        .single();
-
-      if (userError || !userData) {
-        throw new Error("User not found");
+        .select("id, email, full_name")
+        .eq("email", normalizedEmail)
+        .maybeSingle();
+      
+      // If no match, try case-insensitive with ilike
+      if (!userData && !userError) {
+        console.log("No exact match, trying case-insensitive match");
+        const { data: ilikeuserData, error: ilikeError } = await supabase
+          .from("profiles")
+          .select("id, email, full_name")
+          .ilike("email", normalizedEmail)
+          .maybeSingle();
+          
+        if (!ilikeError) {
+          userData = ilikeuserData;
+        }
+      }
+      
+      // If still no match, look for partial matches
+      if (!userData && !userError) {
+        console.log("Trying with partial match");
+        const { data: partialMatches, error: partialError } = await supabase
+          .from("profiles")
+          .select("id, email, full_name")
+          .ilike("email", `%${normalizedEmail}%`)
+          .limit(5);
+        
+        if (!partialError && partialMatches && partialMatches.length > 0) {
+          console.log("Found partial matches:", partialMatches.map(u => u.email));
+          
+          // If only one match, use it
+          if (partialMatches.length === 1) {
+            userData = partialMatches[0];
+          } else {
+            // If multiple matches, throw a specific error
+            throw new Error(`Multiple users found with similar emails. Please use the exact email: ${
+              partialMatches.map(u => u.email).join(", ")
+            }`);
+          }
+        }
+      }
+      
+      // Last try - check with email as substring
+      if (!userData && !userError) {
+        console.log("Checking if email is stored with spaces or different formatting");
+        // Get all profiles and filter manually (as a last resort)
+        const { data: allProfiles, error: allProfilesError } = await supabase
+          .from("profiles")
+          .select("id, email, full_name")
+          .limit(100);
+          
+        if (!allProfilesError && allProfiles && allProfiles.length > 0) {
+          const potentialMatches = allProfiles.filter(profile => 
+            profile.email && 
+            profile.email.toLowerCase().includes(normalizedEmail)
+          );
+          
+          if (potentialMatches.length === 1) {
+            userData = potentialMatches[0];
+            console.log("Found match with email as substring:", userData.email);
+          } else if (potentialMatches.length > 1) {
+            throw new Error(`Multiple users found with similar emails. Please use the exact email: ${
+              potentialMatches.map(u => u.email).join(", ")
+            }`);
+          }
+        }
       }
 
+      if (userError) {
+        console.error("Database error during user lookup:", userError);
+        throw new Error(`Error looking up user: ${userError.message}`);
+      }
+      
+      if (!userData) {
+        // Show a sample of users to help debugging
+        const { data: sampleUsers, error: sampleError } = await supabase
+          .from("profiles")
+          .select("email")
+          .limit(5);
+          
+        if (!sampleError && sampleUsers && sampleUsers.length > 0) {
+          console.log("Sample of available users:", sampleUsers.map(u => u.email));
+        }
+        
+        throw new Error(`No user found with email: ${normalizedEmail}. The user must have a profile in the system.`);
+      }
+
+      console.log("Found user:", userData.email, userData.id);
+
+      // Check if user is already a member of the channel
+      const { data: existingMember, error: memberCheckError } = await supabase
+        .from("channel_members")
+        .select("id")
+        .eq("channel_id", channel.id)
+        .eq("user_id", userData.id)
+        .maybeSingle();
+        
+      if (memberCheckError) {
+        console.error("Error checking existing membership:", memberCheckError);
+      }
+      
+      if (existingMember) {
+        throw new Error(`User ${userData.email} is already a member of this channel`);
+      }
+
+      console.log("Adding user to channel:", userData.email, "->", channel.id);
+      
       // Add the user to the channel
       const { error: memberError } = await supabase
         .from("channel_members")
@@ -415,23 +574,48 @@ export default function ChannelPage() {
         });
 
       if (memberError) {
-        throw new Error("Failed to add user to the channel");
+        console.error("Error adding member:", memberError);
+        
+        // Check if it's a unique constraint violation (user already added)
+        if (memberError.code === '23505') {
+          throw new Error("This user is already a member of the channel");
+        } else {
+          throw new Error(`Failed to add user to the channel: ${memberError.message}`);
+        }
       }
 
       // Send a notification message to the channel about the addition
       await supabase.from("messages").insert({
         channel_id: channel.id,
         user_id: user.id,
-        content: `User with email ${inviteEmail} has been added to the channel.`,
-        is_notification: false,
+        content: `${userData.full_name || userData.email} has been added to the channel.`,
+        is_notification: true,
       });
 
       // Success - show message and clear the input
-      setError(null);
+      setError(`Successfully added ${userData.full_name || userData.email} to the channel`);
       setInviteEmail("");
+      
+      // Refresh members list
+      const { data: membersData } = await supabase
+        .from("channel_members")
+        .select(
+          `
+          *,
+          profiles(*)
+        `
+        )
+        .eq("channel_id", id);
+        
+      if (membersData) {
+        setMembers(membersData);
+      }
 
       // Log success message
-      console.log(`User with email ${inviteEmail} has been added to the channel.`);
+      console.log(`User ${userData.email} has been added to the channel.`);
+      
+      // Clear success message after a few seconds
+      setTimeout(() => setError(null), 5000);
     } catch (err: any) {
       console.error("Error inviting user:", err);
       setError(err.message || "Failed to add user to the channel");
@@ -694,6 +878,88 @@ export default function ChannelPage() {
     }
   };
 
+  // Function to check service worker status
+  const checkServiceWorkerStatus = async () => {
+    setServiceWorkerStatus('Checking...');
+    setShowDebugInfo(true);
+    
+    const debugData: Record<string, any> = {
+      browser: navigator.userAgent,
+      timestamp: new Date().toISOString(),
+    };
+    
+    try {
+      // Check if service workers are supported
+      if (!('serviceWorker' in navigator)) {
+        setServiceWorkerStatus('❌ Service Workers not supported');
+        debugData.supported = false;
+        setDebugInfo(debugData);
+        return;
+      }
+      
+      debugData.supported = true;
+      
+      // Check notification permission
+      debugData.notificationPermission = Notification.permission;
+      
+      // Get all service worker registrations
+      const registrations = await navigator.serviceWorker.getRegistrations();
+      
+      if (registrations.length === 0) {
+        setServiceWorkerStatus('❌ No service workers registered');
+        debugData.registrations = [];
+        setDebugInfo(debugData);
+        return;
+      }
+      
+      // Collect details about service workers
+      const registrationDetails = registrations.map((registration, index) => {
+        const details: Record<string, any> = {
+          scope: registration.scope,
+          active: !!registration.active,
+          installing: !!registration.installing,
+          waiting: !!registration.waiting,
+          updateViaCache: registration.updateViaCache,
+        };
+        
+        if (registration.active) {
+          details.activeState = registration.active.state;
+          details.activeScriptURL = registration.active.scriptURL;
+        }
+        
+        return details;
+      });
+      
+      debugData.registrations = registrationDetails;
+      
+      // Check for push subscription
+      const swRegistration = await navigator.serviceWorker.getRegistration('/sw.js');
+      if (swRegistration) {
+        const subscription = await swRegistration.pushManager.getSubscription();
+        if (subscription) {
+          debugData.pushSubscription = {
+            exists: true,
+            endpoint: subscription.endpoint,
+          };
+          setServiceWorkerStatus('✅ Service worker active with push subscription');
+        } else {
+          debugData.pushSubscription = { exists: false };
+          setServiceWorkerStatus('⚠️ Service worker active but no push subscription');
+        }
+      } else {
+        setServiceWorkerStatus('⚠️ No service worker found for /sw.js');
+      }
+      
+      setDebugInfo(debugData);
+    } catch (error: unknown) {
+      console.error('Error checking service worker:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      setServiceWorkerStatus(`❌ Error: ${errorMessage}`);
+      debugData.error = errorMessage;
+      setDebugInfo(debugData);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex min-h-screen flex-col">
@@ -747,30 +1013,152 @@ export default function ChannelPage() {
             </div>
             <div className="flex items-center gap-4">
               {isPushNotificationSupported() && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={requestPushNotificationPermission}
-                  disabled={pushNotificationStatus === 'granted'}
-                  title={
-                    pushNotificationStatus === 'granted'
-                      ? 'Push notifications are enabled'
-                      : 'Enable push notifications'
-                  }
-                  className="text-xs"
-                >
-                  {pushNotificationStatus === 'granted' ? (
-                    <>
-                      <BellRing className="h-4 w-4 mr-1" />
-                      <span className="hidden sm:inline">Notifications Enabled</span>
-                    </>
-                  ) : (
-                    <>
-                      <BellOff className="h-4 w-4 mr-1" />
-                      <span className="hidden sm:inline">Enable Notifications</span>
-                    </>
-                  )}
-                </Button>
+                <Dialog>
+                  <DialogTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      title={
+                        pushNotificationStatus === 'granted'
+                          ? 'View notification status'
+                          : 'Enable push notifications'
+                      }
+                      className="text-xs"
+                    >
+                      {pushNotificationStatus === 'granted' ? (
+                        <>
+                          <BellRing className="h-4 w-4 mr-1" />
+                          <span className="hidden sm:inline">Notifications</span>
+                        </>
+                      ) : (
+                        <>
+                          <BellOff className="h-4 w-4 mr-1" />
+                          <span className="hidden sm:inline">Enable Notifications</span>
+                        </>
+                      )}
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                      <DialogTitle>Push Notification Diagnostics</DialogTitle>
+                      <DialogDescription>
+                        Check if your browser is properly configured for push notifications
+                      </DialogDescription>
+                    </DialogHeader>
+                    
+                    <div className="py-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="p-4 border rounded-lg">
+                          <h3 className="font-medium mb-3 flex items-center gap-2">
+                            <span className="bg-muted rounded-full p-1">
+                              <Bell className="h-4 w-4" />
+                            </span>
+                            Notification Status
+                          </h3>
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between text-sm">
+                              <span>Permission:</span>
+                              <span className={
+                                Notification.permission === 'granted' 
+                                  ? "text-green-600 font-medium" 
+                                  : Notification.permission === 'denied' 
+                                    ? "text-red-600 font-medium" 
+                                    : "text-amber-600 font-medium"
+                              }>
+                                {Notification.permission === 'granted' && '✓ '}
+                                {Notification.permission === 'denied' && '✕ '}
+                                {Notification.permission === 'default' && '? '}
+                                {Notification.permission}
+                              </span>
+                            </div>
+                            <div className="flex items-center justify-between text-sm">
+                              <span>Push API:</span>
+                              <span className={isPushNotificationSupported() ? "text-green-600 font-medium" : "text-red-600 font-medium"}>
+                                {isPushNotificationSupported() ? '✓ Supported' : '✕ Not Supported'}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                        
+                        <div className="p-4 border rounded-lg">
+                          <h3 className="font-medium mb-3 flex items-center gap-2">
+                            <span className="bg-muted rounded-full p-1">
+                              <span className="h-4 w-4 inline-block text-center text-xs">SW</span>
+                            </span>
+                            Service Worker
+                          </h3>
+                          <div className="min-h-[60px] flex flex-col justify-center">
+                            {serviceWorkerStatus.includes('✅') && (
+                              <div className="flex items-center text-green-600 text-sm">
+                                <span className="mr-2">✓</span>
+                                <span>Active and ready</span>
+                              </div>
+                            )}
+                            {serviceWorkerStatus.includes('⚠️') && (
+                              <div className="flex items-center text-amber-600 text-sm">
+                                <span className="mr-2">⚠️</span>
+                                <span>{serviceWorkerStatus.replace('⚠️ ', '')}</span>
+                              </div>
+                            )}
+                            {serviceWorkerStatus.includes('❌') && (
+                              <div className="flex items-center text-red-600 text-sm">
+                                <span className="mr-2">✕</span>
+                                <span>{serviceWorkerStatus.replace('❌ ', '')}</span>
+                              </div>
+                            )}
+                            {serviceWorkerStatus === 'Checking...' && (
+                              <div className="flex items-center text-muted-foreground text-sm">
+                                <span className="animate-pulse">Checking service worker status...</span>
+                              </div>
+                            )}
+                          </div>
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            onClick={checkServiceWorkerStatus}
+                            className="w-full mt-2"
+                          >
+                            Check Status
+                          </Button>
+                        </div>
+                      </div>
+
+                      {Notification.permission !== 'granted' && (
+                        <div className="mt-4 p-4 border rounded-lg bg-muted/50">
+                          <h3 className="font-medium mb-2">Enable Notifications</h3>
+                          <p className="text-sm text-muted-foreground mb-3">
+                            You'll need to grant permission to receive push notifications from this site.
+                          </p>
+                          <Button 
+                            onClick={requestPushNotificationPermission}
+                            className="w-full"
+                          >
+                            Request Permission
+                          </Button>
+                        </div>
+                      )}
+                      
+                      <div className="mt-4">
+                        <div className="flex items-center justify-between">
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            onClick={() => setShowDebugInfo(!showDebugInfo)}
+                            className="text-xs"
+                          >
+                            {showDebugInfo ? 'Hide Technical Details' : 'Show Technical Details'}
+                          </Button>
+                        </div>
+                        
+                        {showDebugInfo && (
+                          <pre className="p-3 bg-muted rounded-md text-xs overflow-x-auto mt-2 max-h-[200px]">
+                            {JSON.stringify(debugInfo, null, 2)}
+                          </pre>
+                        )}
+                      </div>
+                    </div>
+                  </DialogContent>
+                </Dialog>
               )}
               <Dialog>
                 <DialogTrigger asChild>
@@ -902,7 +1290,7 @@ export default function ChannelPage() {
                         {alert.title}
                       </DialogTitle>
                       <DialogDescription>
-                        {new Date(alert.created_at).toLocaleString()}
+                        {timeAgo(alert.created_at)}
                       </DialogDescription>
                     </DialogHeader>
                     <div className="mt-4">
@@ -959,23 +1347,37 @@ export default function ChannelPage() {
                       return (
                         <div
                           key={message.id}
-                          className="fixed inset-0 flex items-center justify-center z-50"
+                          className="fixed inset-0 flex items-center justify-center z-50 bg-black/50 backdrop-blur-sm animate-in fade-in"
                         >
-                          <div className="bg-red-300 border rounded-lg p-4 mx-4 my-auto max-w-2xl shadow-lg w-full sm:w-auto">
-                            <div className="flex items-center gap-2 mb-2">
-                              <Bell className="h-5 w-5" />
-                              <span className="font-medium text-black">
-                                PUSH NOTIFICATION from {message.profiles.full_name}
-                              </span>
+                          <div className="bg-background border rounded-lg p-6 pt-14 mx-4 my-auto max-w-md shadow-lg w-full transform transition-all scale-in-center relative">
+                            <div className="absolute -top-8 left-1/2 transform -translate-x-1/2">
+                              <div className="p-4 rounded-full bg-red-100 border-4 border-white shadow-md">
+                                <Bell className="h-12 w-12 text-red-600" />
+                              </div>
                             </div>
-                            <p className="text-black">{message.content}</p>
-                            <div className="mt-2 text-xs text-black">
-                              {new Date(message.created_at).toLocaleString()}
+                            
+                            <div className="text-center mb-4">
+                              <h3 className="text-lg font-semibold mt-4">Alert</h3>
+                              <div className="text-xs text-muted-foreground">
+                                {timeAgo(message.created_at)}
+                              </div>
                             </div>
-                            <div className="mt-2">
+                            
+                            <div className="mt-3">
+                              <div className="flex items-start gap-3">
+                                <div>
+                                  <p className="text-sm mt-1">{message.content}</p>
+                                </div>
+                              </div>
+                            </div>
+                            
+                            <div className="flex items-center justify-center mt-4 pt-2 border-t">
                               <Button
-                                variant="outline"
-                                onClick={() => dismissNotification(message.id)}
+                                size="lg"
+                                onClick={() => {
+                                  acknowledgeMessage(message.id);
+                                  dismissNotification(message.id);
+                                }}
                               >
                                 Acknowledge
                               </Button>
@@ -988,32 +1390,37 @@ export default function ChannelPage() {
                     // Display standard notifications inline
                     if (isNotification && !isPushNotification && !dismissedNotifications.includes(message.id)) {
                       return (
-                        <div key={message.id} className="flex items-start gap-4 bg-amber-50 p-3 rounded-md">
-                          <Avatar className="h-10 w-10">
-                            <AvatarImage src={message.profiles.avatar_url || ""} />
-                            <AvatarFallback>{initials}</AvatarFallback>
-                          </Avatar>
+                        <div key={message.id} className="flex items-start gap-3 bg-slate-50 dark:bg-slate-900 p-3 rounded-md border border-slate-200 dark:border-slate-800 mb-4">
+                          <div className="h-8 w-8 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center flex-shrink-0">
+                            <Bell className="h-4 w-4 text-red-600 dark:text-red-400" />
+                          </div>
                           <div className="flex-1">
-                            <div className="flex items-center gap-2 justify-between">
-                              <div className="flex items-center gap-2">
-                                <div className="font-medium">
-                                  {message.profiles.full_name} <span className="text-xs text-muted-foreground">(Notification)</span>
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center">
+                                <div className="font-medium text-sm">
+                                  Alert
                                 </div>
-                                <div className="text-xs text-muted-foreground">
-                                  {new Date(message.created_at).toLocaleString()}
+                                <div className="text-xs text-muted-foreground ml-2">
+                                  {timeAgo(message.created_at)}
                                 </div>
                               </div>
                               <Button 
                                 variant="ghost" 
                                 size="sm" 
                                 onClick={() => dismissNotification(message.id)}
-                                className="h-7 px-2"
+                                className="h-6 px-2 text-xs"
                               >
                                 Dismiss
                               </Button>
                             </div>
-                            <div className="mt-1">
-                              <p>{message.content}</p>
+                            <div className="mt-1 flex items-start gap-2">
+                              <div className="flex-1">
+                                <div className="flex items-center gap-1 mb-0.5">
+                                  <span className="text-xs text-muted-foreground">From:</span>
+                                  <span className="text-xs font-medium">{message.profiles.full_name}</span>
+                                </div>
+                                <p className="text-sm">{message.content}</p>
+                              </div>
                             </div>
                           </div>
                         </div>
@@ -1051,7 +1458,7 @@ export default function ChannelPage() {
                               {message.profiles.full_name}
                             </div>
                             <div className="text-xs text-muted-foreground">
-                              {new Date(message.created_at).toLocaleString()}
+                              {timeAgo(message.created_at)}
                             </div>
                           </div>
                           <div className="mt-1">
