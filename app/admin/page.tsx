@@ -29,6 +29,25 @@ type User = Database["public"]["Tables"]["profiles"]["Row"] & {
   is_admin?: boolean
   avatar_url?: string | null
   phone_number?: string | null
+  blocked?: boolean
+}
+
+// Define a new type for requested items
+type RequestedItem = {
+  id: string
+  channel_id: string
+  user_id: string
+  title: string
+  description: string | null
+  created_at: string
+  status: "requested" | "approved" | "declined"
+  profiles?: Database["public"]["Tables"]["profiles"]["Row"]
+}
+
+// Define a type for grouping requested items by channel
+type RequestedItemsByChannel = {
+  channel: Channel
+  items: RequestedItem[]
 }
 
 export default function AdminPage() {
@@ -54,6 +73,10 @@ export default function AdminPage() {
   const [users, setUsers] = useState<User[]>([])
   const [isLoadingUsers, setIsLoadingUsers] = useState(true)
   const [userError, setUserError] = useState<string | null>(null)
+  // Add new state for requested items
+  const [requestedItemsByChannel, setRequestedItemsByChannel] = useState<RequestedItemsByChannel[]>([])
+  const [isLoadingRequestedItems, setIsLoadingRequestedItems] = useState(true)
+  const [requestedItemsError, setRequestedItemsError] = useState<string | null>(null)
 
   const handleCreateAlert = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -212,6 +235,99 @@ export default function AdminPage() {
     fetchUsers()
   }, [user])
 
+  // Add new useEffect to fetch requested items
+  useEffect(() => {
+    const fetchRequestedItems = async () => {
+      if (!user || !isAdmin) return
+
+      setIsLoadingRequestedItems(true)
+      setRequestedItemsError(null)
+
+      try {
+        // First fetch all channels
+        const { data: channelsData, error: channelsError } = await supabase
+          .from("channels")
+          .select("*")
+          .order("name", { ascending: true })
+
+        if (channelsError) {
+          throw channelsError
+        }
+
+        // Then fetch all requested items - without trying to join profiles
+        const { data: requestedItemsData, error: requestedItemsError } = await supabase
+          .from("requested_items")
+          .select("*")
+          .order("created_at", { ascending: false })
+
+        if (requestedItemsError) {
+          throw requestedItemsError
+        }
+
+        // If we have requested items, fetch the associated profiles separately
+        let profilesMap: Record<string, any> = {}
+        
+        if (requestedItemsData && requestedItemsData.length > 0) {
+          // Get unique user IDs from all requested items
+          const userIds = [...new Set(requestedItemsData.map(item => item.user_id))]
+          
+          // Fetch profiles for these users
+          const { data: profilesData, error: profilesError } = await supabase
+            .from("profiles")
+            .select("*")
+            .in("id", userIds)
+            
+          if (profilesError) {
+            console.error("Error fetching profiles:", profilesError)
+          } else if (profilesData) {
+            // Create a map of user_id -> profile for easy lookup
+            profilesMap = profilesData.reduce((acc, profile) => {
+              acc[profile.id] = profile
+              return acc
+            }, {} as Record<string, any>)
+          }
+        }
+
+        // Group requested items by channel
+        const groupedItems: RequestedItemsByChannel[] = []
+
+        // Initialize each channel with empty items array
+        channelsData.forEach(channel => {
+          groupedItems.push({
+            channel: channel as Channel,
+            items: []
+          })
+        })
+
+        // Add items to their respective channels, with profile data attached
+        requestedItemsData.forEach(item => {
+          const channelGroup = groupedItems.find(group => group.channel.id === item.channel_id)
+          if (channelGroup) {
+            // Attach profile data to the item
+            const itemWithProfile = {
+              ...item,
+              profiles: profilesMap[item.user_id] || null
+            } as RequestedItem
+            
+            channelGroup.items.push(itemWithProfile)
+          }
+        })
+
+        // Filter out channels with no requested items
+        const filteredGroups = groupedItems.filter(group => group.items.length > 0)
+        
+        setRequestedItemsByChannel(filteredGroups)
+      } catch (err: any) {
+        console.error("Error fetching requested items:", err)
+        setRequestedItemsError(err.message || "Failed to load requested items")
+      } finally {
+        setIsLoadingRequestedItems(false)
+      }
+    }
+
+    fetchRequestedItems()
+  }, [user, isAdmin])
+
   const toggleBlockUser = async (userId: string, isBlocked: boolean) => {
     try {
       const { error } = await supabase
@@ -235,6 +351,45 @@ export default function AdminPage() {
     }
   };
 
+  // Helper function to format date
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString)
+    return new Intl.DateTimeFormat('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    }).format(date)
+  }
+
+  // Function to update the status of a requested item
+  const updateRequestedItemStatus = async (itemId: string, status: "approved" | "declined") => {
+    try {
+      const { error } = await supabase
+        .from("requested_items")
+        .update({ status })
+        .eq("id", itemId)
+
+      if (error) {
+        throw error
+      }
+
+      // Update local state to reflect the change
+      setRequestedItemsByChannel(prevGroups => 
+        prevGroups.map(group => ({
+          ...group,
+          items: group.items.map(item => 
+            item.id === itemId ? { ...item, status } : item
+          )
+        }))
+      )
+    } catch (err: any) {
+      console.error("Error updating requested item status:", err)
+      setRequestedItemsError(err.message || "Failed to update item status")
+    }
+  }
+
   return (
     <div className="flex min-h-screen flex-col">
       <Header />
@@ -244,7 +399,7 @@ export default function AdminPage() {
         </div>
 
         <Tabs defaultValue="create-alert" className="w-full">
-          <TabsList className="grid w-full grid-cols-3 mb-4">
+          <TabsList className="grid w-full grid-cols-4 mb-4">
             <TabsTrigger 
               value="create-alert" 
               className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm"
@@ -262,6 +417,12 @@ export default function AdminPage() {
               className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm"
             >
               Active Alerts
+            </TabsTrigger>
+            <TabsTrigger 
+              value="requested-items"
+              className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm"
+            >
+              Requested Items
             </TabsTrigger>
           </TabsList>
 
@@ -408,7 +569,7 @@ export default function AdminPage() {
                           <div>
                             <CardTitle>{user.full_name || user.username}</CardTitle>
                             <CardDescription>
-                              {user.blocked ? (
+                              {user.blocked ?? false ? (
                                 <span className="text-red-500">Blocked</span>
                               ) : (
                                 <span className="text-green-500">Active</span>
@@ -445,9 +606,9 @@ export default function AdminPage() {
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => toggleBlockUser(user.id, user.blocked)}
+                            onClick={() => toggleBlockUser(user.id, user.blocked ?? false)}
                           >
-                            {user.blocked ? "Unblock User" : "Block User"}
+                            {user.blocked ?? false ? "Unblock User" : "Block User"}
                           </Button>
                         </div>
                       </CardHeader>
@@ -527,6 +688,133 @@ export default function AdminPage() {
                         ) : (
                           <p className="text-muted-foreground">No alerts in this channel.</p>
                         )}
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </div>
+          </TabsContent>
+
+          <TabsContent value="requested-items">
+            <div className="space-y-4">
+              {isLoadingRequestedItems ? (
+                <div className="flex justify-center p-8">
+                  <div className="animate-pulse">Loading requested items...</div>
+                </div>
+              ) : requestedItemsError ? (
+                <div className="rounded-md bg-red-50 p-4">
+                  <div className="flex">
+                    <div className="flex-shrink-0">
+                      <AlertTriangle className="h-5 w-5 text-red-400" />
+                    </div>
+                    <div className="ml-3">
+                      <h3 className="text-sm font-medium text-red-800">{requestedItemsError}</h3>
+                    </div>
+                  </div>
+                </div>
+              ) : requestedItemsByChannel.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  No requested items found.
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  {requestedItemsByChannel.map((group) => (
+                    <Card key={group.channel.id}>
+                      <CardHeader>
+                        <CardTitle>
+                          <Link href={`/channels/${group.channel.id}`} className="hover:underline">
+                            {group.channel.name}
+                          </Link>
+                        </CardTitle>
+                        <CardDescription>{group.channel.description}</CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-4">
+                          <div className="overflow-x-auto">
+                            <table className="w-full border-collapse">
+                              <thead>
+                                <tr className="bg-muted/50 text-muted-foreground text-sm">
+                                  <th className="text-left p-3 border-b">Item</th>
+                                  <th className="text-left p-3 border-b">Requested By</th>
+                                  <th className="text-left p-3 border-b">Date</th>
+                                  <th className="text-left p-3 border-b">Status</th>
+                                  <th className="text-right p-3 border-b">Actions</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {group.items.map((item) => (
+                                  <tr key={item.id} className="border-b border-gray-200">
+                                    <td className="p-3">
+                                      <div className="font-medium">{item.title}</div>
+                                      {item.description && (
+                                        <div className="text-sm text-muted-foreground mt-1">
+                                          {item.description}
+                                        </div>
+                                      )}
+                                    </td>
+                                    <td className="p-3">
+                                      <div className="flex items-center gap-2">
+                                        {item.profiles?.avatar_url ? (
+                                          <img 
+                                            src={item.profiles.avatar_url} 
+                                            alt=""
+                                            className="h-6 w-6 rounded-full"
+                                          />
+                                        ) : (
+                                          <div className="h-6 w-6 rounded-full bg-gray-200 flex items-center justify-center">
+                                            <span className="text-xs text-gray-500">
+                                              {(item.profiles?.full_name || '?')[0].toUpperCase()}
+                                            </span>
+                                          </div>
+                                        )}
+                                        <span>{item.profiles?.full_name || "Unknown User"}</span>
+                                      </div>
+                                    </td>
+                                    <td className="p-3 text-sm">
+                                      {formatDate(item.created_at)}
+                                    </td>
+                                    <td className="p-3">
+                                      <span 
+                                        className={`inline-block px-2 py-1 text-xs font-medium rounded-full ${
+                                          item.status === 'approved' 
+                                            ? 'bg-green-100 text-green-800' 
+                                            : item.status === 'declined' 
+                                              ? 'bg-red-100 text-red-800' 
+                                              : 'bg-blue-100 text-blue-800'
+                                        }`}
+                                      >
+                                        {item.status}
+                                      </span>
+                                    </td>
+                                    <td className="p-3 text-right">
+                                      {item.status === 'requested' && (
+                                        <div className="flex items-center justify-end gap-2">
+                                          <Button
+                                            variant="outline"
+                                            size="sm"
+                                            className="text-green-600 border-green-600 hover:bg-green-50"
+                                            onClick={() => updateRequestedItemStatus(item.id, 'approved')}
+                                          >
+                                            Approve
+                                          </Button>
+                                          <Button
+                                            variant="outline"
+                                            size="sm"
+                                            className="text-red-600 border-red-600 hover:bg-red-50"
+                                            onClick={() => updateRequestedItemStatus(item.id, 'declined')}
+                                          >
+                                            Decline
+                                          </Button>
+                                        </div>
+                                      )}
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
                       </CardContent>
                     </Card>
                   ))}

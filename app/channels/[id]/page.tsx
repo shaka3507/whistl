@@ -69,6 +69,18 @@ type AlertPreparationItem = {
   created_at: string;
 };
 
+// Define a new type for requested items
+type RequestedItem = {
+  id: string;
+  channel_id: string;
+  user_id: string;
+  title: string;
+  description: string | null;
+  created_at: string;
+  status: "requested" | "approved" | "declined";
+  profiles?: Database["public"]["Tables"]["profiles"]["Row"];
+};
+
 export default function ChannelPage() {
   const { id } = useParams();
   const { user, profile, isAdmin } = useAuth();
@@ -100,6 +112,11 @@ export default function ChannelPage() {
   const [debugInfo, setDebugInfo] = useState<Record<string, any>>({});
   const [showSuppliesView, setShowSuppliesView] = useState<boolean>(false);
   const [isLocalhost, setIsLocalhost] = useState<boolean>(false);
+  // New state variables for the request item modal
+  const [showRequestItemModal, setShowRequestItemModal] = useState<boolean>(false);
+  const [newItemTitle, setNewItemTitle] = useState<string>("");
+  const [newItemDescription, setNewItemDescription] = useState<string>("");
+  const [requestedItems, setRequestedItems] = useState<RequestedItem[]>([]);
 
   // Check if running on localhost
   useEffect(() => {
@@ -975,6 +992,146 @@ export default function ChannelPage() {
     }
   };
 
+  // After fetchChannelData function, add this effect to fetch requested items
+  useEffect(() => {
+    const fetchRequestedItems = async () => {
+      if (!user || !id) return;
+
+      try {
+        console.log("Fetching requested items for channel:", id);
+        
+        // First check if the table exists by getting the count
+        const { count, error: countError } = await supabase
+          .from("requested_items")
+          .select("*", { count: "exact", head: true })
+          .eq("channel_id", id);
+        
+        if (countError) {
+          console.error("Error checking requested_items table:", countError);
+          // If table doesn't exist, this will likely error
+          return;
+        }
+        
+        console.log(`Found ${count} requested items in database`);
+        
+        // Then fetch the actual data
+        const { data, error } = await supabase
+          .from("requested_items")
+          .select("*")
+          .eq("channel_id", id)
+          .order("created_at", { ascending: false });
+
+        if (error) {
+          console.error("Error fetching requested items:", error);
+          return;
+        }
+
+        console.log("Requested items data:", data);
+        
+        // If we have data but no profiles info, we need to fetch profiles separately
+        if (data && data.length > 0) {
+          // Get all user IDs from requested items
+          const userIds = [...new Set(data.map(item => item.user_id))];
+          
+          // Fetch profiles for these users
+          const { data: profilesData, error: profilesError } = await supabase
+            .from("profiles")
+            .select("*")
+            .in("id", userIds);
+            
+          if (profilesError) {
+            console.error("Error fetching profiles for requested items:", profilesError);
+          } else if (profilesData) {
+            // Create a map of user_id -> profile
+            const profilesMap = profilesData.reduce((acc, profile) => {
+              acc[profile.id] = profile;
+              return acc;
+            }, {});
+            
+            // Attach profiles to requested items
+            const itemsWithProfiles = data.map(item => ({
+              ...item,
+              profiles: profilesMap[item.user_id] || null
+            }));
+            
+            setRequestedItems(itemsWithProfiles);
+            return;
+          }
+        }
+        
+        // Default case - just set the data as-is
+        setRequestedItems(data || []);
+      } catch (err) {
+        console.error("Error in fetchRequestedItems:", err);
+      }
+    };
+
+    fetchRequestedItems();
+  }, [user, id]);
+
+  // Add the function to handle item requests
+  const handleRequestItem = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newItemTitle.trim() || !user || !channel) return;
+
+    setIsSending(true);
+    try {
+      // Use the API endpoint to insert the requested item
+      const response = await fetch('/api/request-item', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          channelId: channel.id,
+          userId: user.id,
+          title: newItemTitle.trim(),
+          description: newItemDescription.trim() || null,
+        }),
+      });
+
+      const result = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to request item');
+      }
+
+      // If successful, add to local state
+      if (result.success && result.requestedItem) {
+        // Create a complete item with user profile info
+        const newItem: RequestedItem = {
+          ...result.requestedItem,
+          profiles: {
+            id: user.id,
+            full_name: profile?.full_name || "Unknown User",
+            avatar_url: profile?.avatar_url || null,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            username: null,
+            phone_number: null
+          }
+        };
+        
+        setRequestedItems(prev => [newItem, ...prev]);
+      }
+
+      // Clear the form
+      setNewItemTitle("");
+      setNewItemDescription("");
+      setShowRequestItemModal(false);
+
+      // Show success message
+      setError("Item requested successfully");
+      setTimeout(() => setError(null), 3000);
+
+    } catch (err: any) {
+      console.error("Error requesting item:", err);
+      setError(err.message || "Failed to request item");
+    } finally {
+      setIsSending(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex min-h-screen flex-col">
@@ -1289,15 +1446,75 @@ export default function ChannelPage() {
                   </div>
                   
                   <div className="overflow-y-auto flex-1 p-4">
+                    <div className="flex justify-end">
+                      <Dialog open={showRequestItemModal} onOpenChange={setShowRequestItemModal}>
+                        <DialogTrigger asChild>
+                          <Button className="rounded-full px-4 bg-blue-500 mb-8">
+                            Request item not listed
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent>
+                          <DialogHeader>
+                            <DialogTitle>Request New Item</DialogTitle>
+                            <DialogDescription>
+                              Submit a request for an item that is not currently listed.
+                            </DialogDescription>
+                          </DialogHeader>
+                          <form onSubmit={handleRequestItem}>
+                            <div className="space-y-4 pt-4">
+                              <div className="space-y-2">
+                                <label htmlFor="item-title" className="text-sm font-medium">
+                                  Item Name
+                                </label>
+                                <Input
+                                  id="item-title"
+                                  placeholder="Enter item name"
+                                  value={newItemTitle}
+                                  onChange={(e) => setNewItemTitle(e.target.value)}
+                                  required
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <label htmlFor="item-description" className="text-sm font-medium">
+                                  Description (optional)
+                                </label>
+                                <Textarea
+                                  id="item-description"
+                                  placeholder="Provide any additional details about the item"
+                                  value={newItemDescription}
+                                  onChange={(e) => setNewItemDescription(e.target.value)}
+                                  className="min-h-[100px]"
+                                />
+                              </div>
+                            </div>
+                            <DialogFooter className="mt-6">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => setShowRequestItemModal(false)}
+                              >
+                                Cancel
+                              </Button>
+                              <Button
+                                type="submit"
+                                disabled={isSending || !newItemTitle.trim()}
+                              >
+                                Submit Request
+                              </Button>
+                            </DialogFooter>
+                          </form>
+                        </DialogContent>
+                      </Dialog>
+                    </div>
                     <div className="max-w-3xl mx-auto">
-                        
-                      {supplyItems.length > 0 ? (
+                      {supplyItems.length > 0 || requestedItems.length > 0 ? (
                         <div className="divide-y border rounded-md overflow-hidden">
                           <div className="grid grid-cols-2 bg-muted/50 text-sm font-medium p-3">
                             <div>Item</div>
                             <div className="text-right">Availability</div>
                           </div>
                           
+                          {/* Render supply items */}
                           {supplyItems.map((item) => {
                             const remainingQuantity = item.quantity - (claimedItems[item.id] || 0);
                             return (
@@ -1314,9 +1531,9 @@ export default function ChannelPage() {
                                   {remainingQuantity > 0 ? (
                                     <Button
                                       onClick={() => claimSupplyItem(item.id)}
-                                      disabled={isAdmin || remainingQuantity <= 0}
+                                      disabled={remainingQuantity <= 0}
                                       size="sm"
-                                      className="rounded-full px-4"
+                                      className="rounded-full px-4 bg-green-500"
                                     >
                                       Claim
                                     </Button>
@@ -1329,6 +1546,28 @@ export default function ChannelPage() {
                               </div>
                             );
                           })}
+
+                          {/* Render requested items */}
+                          {requestedItems.map((item) => (
+                            <div key={item.id} className="grid grid-cols-2 gap-2 p-3 items-center bg-card">
+                              <div>
+                                <div className="font-medium">{item.title}</div>
+                                {item.description && (
+                                  <div className="text-sm text-muted-foreground mt-1">
+                                    {item.description}
+                                  </div>
+                                )}
+                                <div className="text-xs text-muted-foreground mt-1">
+                                  Requested by {item.profiles?.full_name || "Unknown"} {timeAgo(item.created_at)}
+                                </div>
+                              </div>
+                              <div className="text-right">
+                                <span className="text-black text-sm bg-blue-100 px-4 py-2 rounded-full inline-block">
+                                  Item requested
+                                </span>
+                              </div>
+                            </div>
+                          ))}
                         </div>
                       ) : (
                         <div className="text-center py-12 border rounded-lg bg-muted/20">
@@ -1336,9 +1575,17 @@ export default function ChannelPage() {
                             <PackageOpen className="h-12 w-12 mx-auto mb-2 opacity-50" />
                             No supplies currently available
                           </div>
-                          <p className="text-sm text-muted-foreground">
-                            Check back later or contact an administrator
+                          <p className="text-sm text-muted-foreground mb-6">
+                            Use the "Request item not listed" button above to request supplies you need.
                           </p>
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => setShowRequestItemModal(true)}
+                            className="mx-auto"
+                          >
+                            Request an Item
+                          </Button>
                         </div>
                       )}
                     </div>
