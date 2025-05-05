@@ -3,7 +3,7 @@ import { supabase } from "@/lib/supabase";
 
 export async function POST(req: Request) {
   try {
-    const { itemId, userId, claimedQuantity } = await req.json();
+    const { itemId, userId, claimedQuantity, alertId } = await req.json();
 
     // Insert or update the claimed item in the database
     const { data, error } = await supabase
@@ -14,6 +14,7 @@ export async function POST(req: Request) {
           user_id: userId,
           claimed_quantity: claimedQuantity,
           claimed_at: new Date().toISOString(),
+          alert_id: alertId,
         },
       ])
       .select();

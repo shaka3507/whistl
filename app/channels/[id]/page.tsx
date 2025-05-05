@@ -2,7 +2,7 @@
 
 import type React from "react";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useMemo } from "react";
 import { useParams } from "next/navigation";
 import { useAuth } from "@/context/auth-context";
 import { Header } from "@/components/header";
@@ -29,7 +29,9 @@ import {
   Activity,
   BarChart4,
   LineChart,
-  Check
+  Check,
+  ChevronUp,
+  ChevronDown
 } from "lucide-react";
 import {
   Dialog,
@@ -152,9 +154,6 @@ export default function ChannelPage() {
   const [claimedItems, setClaimedItems] = useState<Record<string, number>>({});
   const [pushNotificationEnabled, setPushNotificationEnabled] = useState<boolean>(false);
   const [pushNotificationStatus, setPushNotificationStatus] = useState<string>('unchecked');
-  const [serviceWorkerStatus, setServiceWorkerStatus] = useState<string>('Checking...');
-  const [showDebugInfo, setShowDebugInfo] = useState<boolean>(false);
-  const [debugInfo, setDebugInfo] = useState<Record<string, any>>({});
   const [showSuppliesView, setShowSuppliesView] = useState<boolean>(false);
   const [isLocalhost, setIsLocalhost] = useState<boolean>(false);
   // New state variables for the request item modal
@@ -174,6 +173,9 @@ export default function ChannelPage() {
   const [showCreatePollForm, setShowCreatePollForm] = useState<boolean>(false);
   const [minPollValue, setMinPollValue] = useState<number>(1);
   const [maxPollValue, setMaxPollValue] = useState<number>(5);
+  const [justClaimedItems, setJustClaimedItems] = useState<Set<string>>(new Set());
+  const [userClaimedItems, setUserClaimedItems] = useState<Set<string>>(new Set());
+  const [showUserItems, setShowUserItems] = useState<boolean>(true);
   const { toast } = useToast();
 
   // Check if running on localhost
@@ -773,27 +775,108 @@ export default function ChannelPage() {
 
   const claimSupplyItem = async (itemId: string) => {
     const item = supplyItems.find(item => item.id === itemId);
-    if (!item) return;
+    if (!item) {
+      console.error("Item not found:", itemId);
+      return;
+    }
+
+    // Check if user has already claimed this item
+    if (userClaimedItems.has(itemId)) {
+      console.log("User has already claimed this item");
+      toast({
+        title: "Already Claimed",
+        description: "You've already claimed this item",
+        variant: "default",
+      });
+      return;
+    }
 
     const currentClaimed = claimedItems[itemId] || 0;
-    if (currentClaimed >= item.quantity) return;
-
+    if (currentClaimed >= item.quantity) {
+      console.log("Item already fully claimed");
+      return;
+    }
+    
+    // Safe check for alert - don't proceed without an alertId
+    if (!alert || !alert.id) {
+      console.error("No active alert found, cannot claim item");
+      toast({
+        title: "Error",
+        description: "Cannot claim item without an active alert",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    console.log("Claiming item:", item.name, "for alert ID:", alert.id);
+    
     try {
       const claimedQuantity = currentClaimed + 1;
+      
+      // Prepare request body with all required fields
+      const requestBody = {
+        itemId, 
+        userId: user?.id, 
+        claimedQuantity,
+        alertId: alert.id
+      };
+      
+      console.log("Sending claim request:", requestBody);
+      
       const response = await fetch('/api/claim-item', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ itemId, userId: user?.id, claimedQuantity }),
+        body: JSON.stringify(requestBody),
       });
 
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("API error response:", response.status, errorText);
+        throw new Error(`API error: ${response.status} - ${errorText}`);
+      }
+
       const data = await response.json();
+      console.log("API response:", data);
+      
       if (data.success) {
+        // Check if the response has the saved item with null alert_id
+        const hasNullAlertId = data.data && data.data.length > 0 && data.data[0].alert_id === null;
+        if (hasNullAlertId) {
+          console.warn("API saved the item with null alert_id. Using local tracking as fallback.");
+          // Store the claimed item ID to localStorage as a fallback
+          try {
+            const localClaimedItems = JSON.parse(localStorage.getItem('claimedItems') || '{}');
+            localClaimedItems[itemId] = claimedQuantity;
+            localStorage.setItem('claimedItems', JSON.stringify(localClaimedItems));
+          } catch (e) {
+            console.error("Failed to save claimed item to local storage:", e);
+          }
+        }
+        
+        // Update claimed quantities
         setClaimedItems(prev => ({
           ...prev,
           [itemId]: claimedQuantity
         }));
+        
+        // Add to just claimed set for UI feedback
+        setJustClaimedItems(prev => new Set([...prev, itemId]));
+        
+        // Add to user claimed items set for persistence
+        const newUserClaimedItems = new Set(userClaimedItems);
+        newUserClaimedItems.add(itemId);
+        setUserClaimedItems(newUserClaimedItems);
+        
+        // Store user claimed items in localStorage
+        if (user) {
+          try {
+            localStorage.setItem(`user_claimed_${user.id}`, JSON.stringify([...newUserClaimedItems]));
+          } catch (e) {
+            console.error("Failed to save user claimed items to localStorage:", e);
+          }
+        }
         
         // Show success toast notification
         toast({
@@ -801,6 +884,14 @@ export default function ChannelPage() {
           description: `You've successfully claimed ${item.name}`,
           variant: "default",
         });
+        
+        // Immediately fetch the latest claimed items to ensure data consistency
+        await fetchClaimedItems(alert.id);
+        
+        // Also fetch user's specific claimed items
+        if (user) {
+          await fetchUserClaimedItems(user.id);
+        }
       } else {
         console.error("Failed to claim item:", data.error);
         // Show error toast notification
@@ -820,6 +911,111 @@ export default function ChannelPage() {
       });
     }
   };
+
+  // Add a new function to fetch items claimed by a specific user
+  const fetchUserClaimedItems = async (userId: string) => {
+    if (!userId) {
+      console.error("No userId provided to fetchUserClaimedItems");
+      return;
+    }
+
+    try {
+      console.log("Fetching items claimed by user:", userId);
+      
+      const { data, error } = await supabase
+        .from("claimed_supply_items")
+        .select("item_id")
+        .eq("user_id", userId);
+
+      if (error) {
+        console.error("Error fetching user claimed items:", error);
+        return;
+      }
+
+      console.log("User claimed items data:", data);
+      
+      if (data && data.length > 0) {
+        const claimedItemIds = data.map(item => item.item_id);
+        setUserClaimedItems(new Set(claimedItemIds));
+        
+        // Update localStorage
+        try {
+          localStorage.setItem(`user_claimed_${userId}`, JSON.stringify(claimedItemIds));
+        } catch (e) {
+          console.error("Failed to save user claimed items to localStorage:", e);
+        }
+      } else {
+        // If no data from DB, try to load from localStorage
+        try {
+          const storedItems = localStorage.getItem(`user_claimed_${userId}`);
+          if (storedItems) {
+            setUserClaimedItems(new Set(JSON.parse(storedItems)));
+          }
+        } catch (e) {
+          console.error("Error loading claimed items from localStorage:", e);
+        }
+      }
+    } catch (err) {
+      console.error("Error in fetchUserClaimedItems:", err);
+    }
+  };
+
+  // Extract this into a separate, reusable function that can be called after claiming
+  const fetchClaimedItems = async (alertId: string) => {
+    if (!alertId) {
+      console.error("No alertId provided to fetchClaimedItems");
+      return;
+    }
+
+    try {
+      console.log("Fetching claimed items for alert:", alertId);
+      
+      // Use a cache-busting query parameter to avoid caching issues
+      const timestamp = new Date().getTime();
+      
+      const { data, error } = await supabase
+        .from("claimed_supply_items")
+        .select("*")
+        .eq("alert_id", alertId);
+
+      if (error) {
+        console.error("Error fetching claimed items:", error);
+        return;
+      }
+
+      console.log("Claimed items data:", data);
+      
+      // Check if we got any data
+      if (!data || data.length === 0) {
+        console.log("No claimed items found for alert:", alertId);
+      }
+      
+      // Map claimed items to a dictionary for easy access
+      const claimedItemsMap = data.reduce((acc, item) => {
+        acc[item.item_id] = item.claimed_quantity;
+        return acc;
+      }, {});
+
+      console.log("Updated claimed items map:", claimedItemsMap);
+      setClaimedItems(claimedItemsMap);
+    } catch (err) {
+      console.error("Error in fetchClaimedItems:", err);
+    }
+  };
+
+  // Add a new effect to fetch user claimed items when the user is loaded
+  useEffect(() => {
+    if (user && user.id) {
+      fetchUserClaimedItems(user.id);
+    }
+  }, [user]);
+
+  // Update the useEffect to use the new function
+  useEffect(() => {
+    if (alert) {
+      fetchClaimedItems(alert.id);
+    }
+  }, [alert]);
 
   const getRemainingQuantity = (item: AlertPreparationItem) => {
     const claimed = claimedItems[item.id] || 0;
@@ -843,36 +1039,6 @@ export default function ChannelPage() {
     }
   };
 
-  useEffect(() => {
-    const fetchClaimedItems = async () => {
-      if (!alert) return;
-
-      try {
-        const { data, error } = await supabase
-          .from("claimed_supply_items")
-          .select("*")
-          .eq("alert_id", alert.id);
-
-        if (error) {
-          console.error("Error fetching claimed items:", error);
-          return;
-        }
-
-        // Map claimed items to a dictionary for easy access
-        const claimedItemsMap = data.reduce((acc, item) => {
-          acc[item.item_id] = item.claimed_quantity;
-          return acc;
-        }, {});
-
-        setClaimedItems(claimedItemsMap);
-      } catch (err) {
-        console.error("Error in fetchClaimedItems:", err);
-      }
-    };
-
-    fetchClaimedItems();
-  }, [alert]);
-
   // Function to request push notification permission
   const requestPushNotificationPermission = async () => {
     try {
@@ -884,96 +1050,33 @@ export default function ChannelPage() {
       setPushNotificationEnabled(status === 'granted');
       
       if (status === 'granted') {
-        // Show a success message
-        setError('Push notifications enabled successfully!');
-        setTimeout(() => setError(null), 3000);
+        // Show success message as a toast instead of error state
+        toast({
+          title: "Notifications Enabled",
+          description: "Push notifications have been enabled successfully!",
+          variant: "default",
+        });
+      } else if (status === 'denied') {
+        toast({
+          title: "Notifications Blocked",
+          description: "Please enable notifications in your browser settings.",
+          variant: "destructive",
+        });
       }
     } catch (err) {
       console.error('Error enabling push notifications:', err);
-      setError('Failed to enable push notifications. Please try again.');
+      toast({
+        title: "Notification Error",
+        description: "Failed to enable push notifications. Please try again.",
+        variant: "destructive",
+      });
     }
   };
 
   // Function to check service worker status
   const checkServiceWorkerStatus = async () => {
-    setServiceWorkerStatus('Checking...');
-    setShowDebugInfo(true);
-    
-    const debugData: Record<string, any> = {
-      browser: navigator.userAgent,
-      timestamp: new Date().toISOString(),
-    };
-    
-    try {
-      // Check if service workers are supported
-      if (!('serviceWorker' in navigator)) {
-        setServiceWorkerStatus('❌ Service Workers not supported');
-        debugData.supported = false;
-        setDebugInfo(debugData);
-        return;
-      }
-      
-      debugData.supported = true;
-      
-      // Check notification permission
-      debugData.notificationPermission = Notification.permission;
-      
-      // Get all service worker registrations
-      const registrations = await navigator.serviceWorker.getRegistrations();
-      
-      if (registrations.length === 0) {
-        setServiceWorkerStatus('❌ No service workers registered');
-        debugData.registrations = [];
-        setDebugInfo(debugData);
-        return;
-      }
-      
-      // Collect details about service workers
-      const registrationDetails = registrations.map((registration, index) => {
-        const details: Record<string, any> = {
-          scope: registration.scope,
-          active: !!registration.active,
-          installing: !!registration.installing,
-          waiting: !!registration.waiting,
-          updateViaCache: registration.updateViaCache,
-        };
-        
-        if (registration.active) {
-          details.activeState = registration.active.state;
-          details.activeScriptURL = registration.active.scriptURL;
-        }
-        
-        return details;
-      });
-      
-      debugData.registrations = registrationDetails;
-      
-      // Check for push subscription
-      const swRegistration = await navigator.serviceWorker.getRegistration('/sw.js');
-      if (swRegistration) {
-        const subscription = await swRegistration.pushManager.getSubscription();
-        if (subscription) {
-          debugData.pushSubscription = {
-            exists: true,
-            endpoint: subscription.endpoint,
-          };
-          setServiceWorkerStatus('✅ Service worker active with push subscription');
-        } else {
-          debugData.pushSubscription = { exists: false };
-          setServiceWorkerStatus('⚠️ Service worker active but no push subscription');
-        }
-      } else {
-        setServiceWorkerStatus('⚠️ No service worker found for /sw.js');
-      }
-      
-      setDebugInfo(debugData);
-    } catch (error: unknown) {
-      console.error('Error checking service worker:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      setServiceWorkerStatus(`❌ Error: ${errorMessage}`);
-      debugData.error = errorMessage;
-      setDebugInfo(debugData);
-    }
+    // No UI updates, just console logging for developers
+    console.log("Service worker status check removed from UI");
   };
 
   // After fetchChannelData function, add this effect to fetch requested items
@@ -1320,6 +1423,27 @@ export default function ChannelPage() {
     }
   };
 
+  // Add a new effect to load user claimed items from localStorage on mount
+  useEffect(() => {
+    if (typeof window !== 'undefined' && user) {
+      try {
+        // Try to get claimed items from localStorage first
+        const storedItems = localStorage.getItem(`user_claimed_${user.id}`);
+        if (storedItems) {
+          setUserClaimedItems(new Set(JSON.parse(storedItems)));
+        }
+      } catch (e) {
+        console.error("Error loading claimed items from localStorage:", e);
+      }
+    }
+  }, [user]);
+
+  // Add a helper function to check if the user is a member of the channel
+  const isUserChannelMember = useMemo(() => {
+    if (!user || !members) return false;
+    return members.some(member => member.user_id === user.id);
+  }, [user, members]);
+
   if (isLoading) {
     return (
       <div className="flex min-h-screen flex-col">
@@ -1376,136 +1500,6 @@ export default function ChannelPage() {
               scrollbarWidth: 'none' as const, 
               WebkitOverflowScrolling: 'touch' as const 
             }}>
-              {isLocalhost && isPushNotificationSupported() && (
-                <Dialog>
-                  <DialogTrigger asChild>
-                    <Button variant="outline" size="sm" className="flex-shrink-0 px-2 sm:px-3 rounded-full transition-colors hover:bg-blue-100 hover:text-blue-700 hover:border-blue-300 dark:hover:bg-blue-800/30 dark:hover:text-blue-400">
-                      <Bell className="h-4 w-4 sm:mr-1" />
-                      <span className="hidden sm:inline">Notifications</span>
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className="sm:max-w-md">
-                    <DialogHeader>
-                      <DialogTitle>Push Notification Diagnostics</DialogTitle>
-                      <DialogDescription>
-                        Check if your browser is properly configured for push notifications
-                      </DialogDescription>
-                    </DialogHeader>
-                    
-                    <div className="py-4">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="p-4 border rounded-lg">
-                          <h3 className="font-medium mb-3 flex items-center gap-2">
-                            <span className="bg-muted rounded-full p-1">
-                              <Bell className="h-4 w-4" />
-                            </span>
-                            Notification Status
-                          </h3>
-                          <div className="space-y-2">
-                            <div className="flex items-center justify-between text-sm">
-                              <span>Permission:</span>
-                              <span className={
-                                Notification.permission === 'granted' 
-                                  ? "text-green-600 font-medium" 
-                                  : Notification.permission === 'denied' 
-                                    ? "text-red-600 font-medium" 
-                                    : "text-amber-600 font-medium"
-                              }>
-                                {Notification.permission === 'granted' && '✓ '}
-                                {Notification.permission === 'denied' && '✕ '}
-                                {Notification.permission === 'default' && '? '}
-                                {Notification.permission}
-                              </span>
-                            </div>
-                            <div className="flex items-center justify-between text-sm">
-                              <span>Push API:</span>
-                              <span className={isPushNotificationSupported() ? "text-green-600 font-medium" : "text-red-600 font-medium"}>
-                                {isPushNotificationSupported() ? '✓ Supported' : '✕ Not Supported'}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                        
-                        <div className="p-4 border rounded-lg">
-                          <h3 className="font-medium mb-3 flex items-center gap-2">
-                            <span className="bg-muted rounded-full p-1">
-                              <span className="h-4 w-4 inline-block text-center text-xs">SW</span>
-                            </span>
-                            Service Worker
-                          </h3>
-                          <div className="min-h-[60px] flex flex-col justify-center">
-                            {serviceWorkerStatus.includes('✅') && (
-                              <div className="flex items-center text-green-600 text-sm">
-                                <span className="mr-2">✓</span>
-                                <span>Active and ready</span>
-                              </div>
-                            )}
-                            {serviceWorkerStatus.includes('⚠️') && (
-                              <div className="flex items-center text-amber-600 text-sm">
-                                <span className="mr-2">⚠️</span>
-                                <span>{serviceWorkerStatus.replace('⚠️ ', '')}</span>
-                              </div>
-                            )}
-                            {serviceWorkerStatus.includes('❌') && (
-                              <div className="flex items-center text-red-600 text-sm">
-                                <span className="mr-2">✕</span>
-                                <span>{serviceWorkerStatus.replace('❌ ', '')}</span>
-                              </div>
-                            )}
-                            {serviceWorkerStatus === 'Checking...' && (
-                              <div className="flex items-center text-muted-foreground text-sm">
-                                <span className="animate-pulse">Checking service worker status...</span>
-                              </div>
-                            )}
-                          </div>
-                          <Button 
-                            variant="outline" 
-                            size="sm" 
-                            onClick={checkServiceWorkerStatus}
-                            className="w-full mt-2"
-                          >
-                            Check Status
-                          </Button>
-                        </div>
-                      </div>
-
-                      {Notification.permission !== 'granted' && (
-                        <div className="mt-4 p-4 border rounded-lg bg-muted/50">
-                          <h3 className="font-medium mb-2">Enable Notifications</h3>
-                          <p className="text-sm text-muted-foreground mb-3">
-                            You'll need to grant permission to receive push notifications from this site.
-                          </p>
-                          <Button 
-                            onClick={requestPushNotificationPermission}
-                            className="w-full"
-                          >
-                            Request Permission
-                          </Button>
-                        </div>
-                      )}
-                      
-                      <div className="mt-4">
-                        <div className="flex items-center justify-between">
-                          <Button 
-                            variant="ghost" 
-                            size="sm"
-                            onClick={() => setShowDebugInfo(!showDebugInfo)}
-                            className="text-xs"
-                          >
-                            {showDebugInfo ? 'Hide Technical Details' : 'Show Technical Details'}
-                          </Button>
-                        </div>
-                        
-                        {showDebugInfo && (
-                          <pre className="p-3 bg-muted rounded-md text-xs overflow-x-auto mt-2 max-h-[200px]">
-                            {JSON.stringify(debugInfo, null, 2)}
-                          </pre>
-                        )}
-                      </div>
-                    </div>
-                  </DialogContent>
-                </Dialog>
-              )}
               <Button 
                 variant="outline" 
                 size="sm" 
@@ -1906,11 +1900,12 @@ export default function ChannelPage() {
                   </div>
                   
                   <div className="overflow-y-auto flex-1 p-4">
-                    <div className="flex justify-end">
+                    {/* Always show "I need something not listed" button at the top */}
+                    <div className="flex justify-end mb-6">
                       <Dialog open={showRequestItemModal} onOpenChange={setShowRequestItemModal}>
                         <DialogTrigger asChild>
-                          <Button className="rounded-full px-4 bg-blue-500 mb-8">
-                            Request item not listed
+                          <Button className="rounded-full px-4 bg-blue-500">
+                            I need something not listed
                           </Button>
                         </DialogTrigger>
                         <DialogContent>
@@ -1966,88 +1961,125 @@ export default function ChannelPage() {
                         </DialogContent>
                       </Dialog>
                     </div>
-                    <div className="max-w-3xl mx-auto">
-                      {supplyItems.length > 0 || requestedItems.length > 0 ? (
-                        <div className="divide-y border rounded-md overflow-hidden">
-                          <div className="grid grid-cols-2 bg-muted/50 text-sm font-medium p-3">
-                            <div>Item</div>
-                            <div className="text-right">Availability</div>
+                    
+                    {/* User's Items Section as a Collapsible */}
+                    {(userClaimedItems.size > 0 || requestedItems.some(item => item.user_id === user?.id)) && (
+                      <div className="mb-6 border rounded-lg overflow-hidden">
+                        <button 
+                          className="w-full bg-blue-50 dark:bg-blue-900/20 p-3 border-b flex items-center justify-between"
+                          onClick={() => setShowUserItems(!showUserItems)}
+                        >
+                          <h3 className="font-medium">Your Items</h3>
+                          <div className="text-muted-foreground">
+                            {showUserItems ? (
+                              <ChevronUp className="h-4 w-4" />
+                            ) : (
+                              <ChevronDown className="h-4 w-4" />
+                            )}
                           </div>
-                          
-                          {/* Render supply items */}
-                          {supplyItems.map((item) => {
-                            const remainingQuantity = item.quantity - (claimedItems[item.id] || 0);
-                            return (
-                              <div key={item.id} className="grid grid-cols-2 gap-2 p-3 items-center bg-card">
-                                <div>
-                                  <div className="font-medium">{item.name}</div>
-                                  <div className="text-md text-muted-foreground mt-1">
-                                    {remainingQuantity > 0 
-                                      ? `${remainingQuantity} of ${item.quantity} available` 
-                                      : 'None available'}
-                                  </div>
-                                </div>
-                                <div className="text-right">
-                                  {remainingQuantity > 0 ? (
-                                    <Button
-                                      onClick={() => claimSupplyItem(item.id)}
-                                      disabled={remainingQuantity <= 0}
-                                      size="sm"
-                                      className="rounded-full px-4 bg-green-500"
-                                    >
-                                      Claim
-                                    </Button>
-                                  ) : (
-                                    <span className="text-muted-foreground text-sm bg-muted px-3 py-1 rounded-full inline-block">
-                                      Out of stock
-                                    </span>
-                                  )}
+                        </button>
+                        
+                        {showUserItems && (
+                          <div className="divide-y">
+                            {/* User's claimed items */}
+                            {userClaimedItems.size > 0 && (
+                              <div className="p-4">
+                                <h4 className="text-sm font-medium mb-3">Items You've Claimed</h4>
+                                <div className="space-y-2">
+                                  {Array.from(userClaimedItems).map(itemId => {
+                                    const item = supplyItems.find(i => i.id === itemId);
+                                    return item ? (
+                                      <div key={item.id} className="flex items-center justify-between py-2 px-3 bg-white dark:bg-gray-800 rounded-md border">
+                                        <div>
+                                          <div className="font-medium">{item.name}</div>
+                                        </div>
+                                        <div className="text-xs px-2 py-1 rounded-full bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
+                                          Claimed
+                                        </div>
+                                      </div>
+                                    ) : null;
+                                  })}
                                 </div>
                               </div>
-                            );
-                          })}
-
-                          {/* Render requested items */}
-                          {requestedItems.map((item) => (
-                            <div key={item.id} className="grid grid-cols-2 gap-2 p-3 items-center bg-card">
-                              <div>
-                                <div className="font-medium">{item.title}</div>
-                                {item.description && (
-                                  <div className="text-sm text-muted-foreground mt-1">
-                                    {item.description}
-                                  </div>
-                                )}
-                                <div className="text-xs text-muted-foreground mt-1">
-                                  Requested by {item.profiles?.full_name || "Unknown"} {timeAgo(item.created_at)}
+                            )}
+                            
+                            {/* User's requested items */}
+                            {requestedItems.some(item => item.user_id === user?.id) && (
+                              <div className="p-4">
+                                <h4 className="text-sm font-medium mb-3">Items You've Requested</h4>
+                                <div className="space-y-2">
+                                  {requestedItems
+                                    .filter(item => item.user_id === user?.id)
+                                    .map(item => (
+                                      <div key={item.id} className="flex items-center justify-between py-2 px-3 bg-white dark:bg-gray-800 rounded-md border">
+                                        <div>
+                                          <div className="font-medium">{item.title}</div>
+                                          {item.description && (
+                                            <div className="text-xs text-muted-foreground mt-1">{item.description}</div>
+                                          )}
+                                          <div className="text-xs text-muted-foreground mt-1">{timeAgo(item.created_at)}</div>
+                                        </div>
+                                        <div className="text-xs px-2 py-1 rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400">
+                                          Requested
+                                        </div>
+                                      </div>
+                                    ))
+                                  }
                                 </div>
                               </div>
-                              <div className="text-right">
-                                <span className="text-black text-sm bg-blue-100 px-4 py-2 rounded-full inline-block">
-                                  Item requested
-                                </span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    
+                    {/* Available supplies list */}
+                    <div className="border rounded-lg overflow-hidden">
+                      <div className="grid grid-cols-2 bg-muted/50 text-sm font-medium p-3">
+                        <div>Item</div>
+                        <div className="text-right">Availability</div>
+                      </div>
+                      
+                      {/* Render supply items */}
+                      {supplyItems.map((item) => {
+                        const remainingQuantity = getRemainingQuantity(item);
+                        const hasJustClaimed = justClaimedItems.has(item.id);
+                        const userHasClaimed = userClaimedItems.has(item.id);
+                        
+                        return (
+                          <div key={item.id} className="grid grid-cols-2 gap-2 p-3 items-center bg-card">
+                            <div>
+                              <div className="font-medium">{item.name}</div>
+                              <div className="text-md text-muted-foreground mt-1">
+                                {remainingQuantity > 0 
+                                  ? `${remainingQuantity} of ${item.quantity} available` 
+                                  : 'None available'}
                               </div>
+                              {userHasClaimed && (
+                                <div className="text-xs text-green-600 mt-1">
+                                  You've claimed this item
+                                </div>
+                              )}
                             </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <div className="text-center py-12 border rounded-lg bg-muted/20">
-                          <div className="mb-2 text-muted-foreground">
-                            <PackageOpen className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                            No supplies currently available
+                            <div className="text-right">
+                              {remainingQuantity > 0 ? (
+                                <Button
+                                  onClick={() => claimSupplyItem(item.id)}
+                                  disabled={remainingQuantity <= 0 || hasJustClaimed || userHasClaimed}
+                                  size="sm"
+                                  className={`rounded-full px-4 ${(hasJustClaimed || userHasClaimed) ? 'bg-green-700' : 'bg-green-500'}`}
+                                >
+                                  {(hasJustClaimed || userHasClaimed) ? 'Claimed' : 'Claim'}
+                                </Button>
+                              ) : (
+                                <span className="text-muted-foreground text-sm bg-muted px-3 py-1 rounded-full inline-block">
+                                  Out of stock
+                                </span>
+                              )}
+                            </div>
                           </div>
-                          <p className="text-sm text-muted-foreground mb-6">
-                            Use the "Request item not listed" button above to request supplies you need.
-                          </p>
-                          <Button 
-                            variant="outline" 
-                            size="sm"
-                            onClick={() => setShowRequestItemModal(true)}
-                            className="mx-auto"
-                          >
-                            Request an Item
-                          </Button>
-                        </div>
-                      )}
+                        );
+                      })}
                     </div>
                   </div>
                 </div>
@@ -2219,12 +2251,11 @@ export default function ChannelPage() {
               )}
             </div>
             <div className="border-t p-4">
-              {isAdmin && (
+              {isAdmin ? (
                 <Tabs defaultValue="message" className="mb-4">
                   <TabsList>
                     <TabsTrigger value="message">Message</TabsTrigger>
                     <TabsTrigger value="notification">Notification</TabsTrigger>
-                    <TabsTrigger value="upload">Upload Image</TabsTrigger>
                   </TabsList>
                   <TabsContent value="message">
                     <form onSubmit={handleSendMessage} className="flex gap-2">
@@ -2274,23 +2305,8 @@ export default function ChannelPage() {
                       </Button>
                     </form>
                   </TabsContent>
-                  <TabsContent value="upload">
-                    <div className="flex gap-2">
-                      <Input
-                        type="file"
-                        accept="image/*"
-                        ref={fileInputRef}
-                        disabled={isSending}
-                      />
-                      <Button onClick={handleFileUpload} disabled={isSending}>
-                        <ImageIcon className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </TabsContent>
                 </Tabs>
-              )}
-
-              {!isAdmin && (
+              ) : isUserChannelMember ? (
                 <form onSubmit={handleSendMessage} className="flex gap-2">
                   <Input
                     placeholder="Type your message..."
@@ -2305,6 +2321,10 @@ export default function ChannelPage() {
                     <Send className="h-4 w-4" />
                   </Button>
                 </form>
+              ) : (
+                <div className="text-center text-muted-foreground py-2 text-sm">
+                  You are not a member of this channel and cannot send messages.
+                </div>
               )}
             </div>
           </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/context/auth-context";
 import { Header } from "@/components/header";
@@ -9,7 +9,8 @@ import { Input } from "@/components/ui/input";
 import { supabase } from "@/lib/supabase";
 import { AlertTriangle, Check } from "lucide-react";
 
-export default function InvitePage() {
+// Create a wrapper component that uses useSearchParams
+function InviteContent() {
   const { user, signIn, signUp } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -334,19 +335,6 @@ export default function InvitePage() {
               // Sign Up Form
               <form onSubmit={handleSignUp} className="space-y-4">
                 <div className="space-y-2">
-                  <label className="text-sm font-medium" htmlFor="email">
-                    Email
-                  </label>
-                  <Input
-                    id="email"
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    disabled
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
                   <label className="text-sm font-medium" htmlFor="full-name">
                     Full Name
                   </label>
@@ -410,5 +398,26 @@ export default function InvitePage() {
         </div>
       </main>
     </div>
+  );
+}
+
+// Fallback content while the page is loading
+function LoadingFallback() {
+  return (
+    <div className="flex min-h-screen flex-col">
+      <Header />
+      <main className="flex-1 flex items-center justify-center">
+        <div className="animate-pulse">Loading invitation...</div>
+      </main>
+    </div>
+  );
+}
+
+// Main page component wrapped with Suspense
+export default function InvitePage() {
+  return (
+    <Suspense fallback={<LoadingFallback />}>
+      <InviteContent />
+    </Suspense>
   );
 } 
