@@ -25,7 +25,10 @@ import {
   PackageOpen,
   ArrowLeft,
   Info,
-  AlertCircle
+  AlertCircle,
+  Activity,
+  BarChart4,
+  LineChart
 } from "lucide-react";
 import {
   Dialog,
@@ -81,6 +84,38 @@ type RequestedItem = {
   profiles?: Database["public"]["Tables"]["profiles"]["Row"];
 };
 
+// Define new types for wellness polls
+type Poll = Database["public"]["Tables"]["polls"]["Row"];
+type PollResponse = Database["public"]["Tables"]["poll_responses"]["Row"];
+
+// Define type for poll results
+type PollResult = {
+  id: string;
+  title: string;
+  description: string | null;
+  createdAt: string;
+  minValue: number;
+  maxValue: number;
+  stats: {
+    total: number;
+    average: number;
+    distribution: Record<number, number>;
+  };
+  respondedMembers: Array<{
+    userId: string;
+    fullName: string;
+    avatarUrl: string | null;
+    responseValue: number;
+    comment: string | null;
+    respondedAt: string;
+  }>;
+  nonRespondedMembers: Array<{
+    userId: string;
+    fullName: string;
+    avatarUrl: string | null;
+  }>;
+};
+
 export default function ChannelPage() {
   const { id } = useParams();
   const { user, profile, isAdmin } = useAuth();
@@ -117,6 +152,18 @@ export default function ChannelPage() {
   const [newItemTitle, setNewItemTitle] = useState<string>("");
   const [newItemDescription, setNewItemDescription] = useState<string>("");
   const [requestedItems, setRequestedItems] = useState<RequestedItem[]>([]);
+  // Add new state variables inside the ChannelPage component function
+  const [showWellnessView, setShowWellnessView] = useState<boolean>(false);
+  const [activeWellnessPoll, setActiveWellnessPoll] = useState<Poll | null>(null);
+  const [pollResponse, setPollResponse] = useState<number>(3); // Default to middle value
+  const [pollComment, setPollComment] = useState<string>("");
+  const [pollResults, setPollResults] = useState<PollResult[]>([]);
+  const [loadingPollResults, setLoadingPollResults] = useState<boolean>(false);
+  const [newPollTitle, setNewPollTitle] = useState<string>("");
+  const [newPollDescription, setNewPollDescription] = useState<string>("");
+  const [showCreatePollForm, setShowCreatePollForm] = useState<boolean>(false);
+  const [minPollValue, setMinPollValue] = useState<number>(1);
+  const [maxPollValue, setMaxPollValue] = useState<number>(5);
 
   // Check if running on localhost
   useEffect(() => {
@@ -1132,6 +1179,210 @@ export default function ChannelPage() {
     }
   };
 
+  // Add these new functions before the return statement in the ChannelPage component
+  const createWellnessPoll = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newPollTitle.trim() || !user || !channel) return;
+
+    setIsSending(true);
+    try {
+      const response = await fetch('/api/create-wellness-poll', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          channelId: channel.id,
+          userId: user.id,
+          title: newPollTitle.trim(),
+          description: newPollDescription.trim() || null,
+          minValue: minPollValue,
+          maxValue: maxPollValue,
+          sendPushNotification: true
+        }),
+      });
+
+      const result = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to create wellness poll');
+      }
+
+      // Reset form
+      setNewPollTitle("");
+      setNewPollDescription("");
+      setShowCreatePollForm(false);
+
+      // Show success message
+      setError("Wellness poll created successfully");
+      setTimeout(() => setError(null), 3000);
+
+      // Refresh poll results if we're in the wellness view
+      if (showWellnessView) {
+        fetchPollResults();
+      }
+    } catch (err: any) {
+      console.error("Error creating wellness poll:", err);
+      setError(err.message || "Failed to create wellness poll");
+    } finally {
+      setIsSending(false);
+    }
+  };
+
+  const respondToPoll = async (pollId: string) => {
+    if (!user || !pollId) return;
+
+    setIsSending(true);
+    try {
+      const response = await fetch('/api/respond-to-poll', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          pollId,
+          userId: user.id,
+          responseValue: pollResponse,
+          comment: pollComment.trim() || null
+        }),
+      });
+
+      const result = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to respond to poll');
+      }
+
+      // Reset form
+      setPollResponse(3);
+      setPollComment("");
+      setActiveWellnessPoll(null);
+
+      // Show success message
+      setError("Response submitted successfully");
+      setTimeout(() => setError(null), 3000);
+
+      // Refresh poll results if we're in the wellness view
+      if (showWellnessView && isAdmin) {
+        fetchPollResults();
+      }
+    } catch (err: any) {
+      console.error("Error responding to poll:", err);
+      setError(err.message || "Failed to submit response");
+    } finally {
+      setIsSending(false);
+    }
+  };
+
+  const fetchPollResults = async () => {
+    if (!user || !channel) return;
+
+    setLoadingPollResults(true);
+    try {
+      // Add detailed logging for debugging
+      console.log(`Fetching poll results for channel: ${channel.id}, user: ${user.id}`);
+      
+      const response = await fetch(`/api/get-poll-results?channelId=${channel.id}&userId=${user.id}`);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`Error response from poll results API: ${response.status} - ${errorText}`);
+        throw new Error(`Failed to fetch poll results: Status ${response.status}`);
+      }
+
+      const data = await response.json();
+      setPollResults(data.polls || []);
+      
+      if (data.polls && data.polls.length > 0) {
+        console.log(`Successfully fetched ${data.polls.length} poll results`);
+      } else {
+        console.log('No poll results available');
+      }
+    } catch (err: any) {
+      console.error("Error fetching poll results:", err);
+      setError(err.message || "Failed to fetch poll results");
+    } finally {
+      setLoadingPollResults(false);
+    }
+  };
+
+  // Add a useEffect to check for polls in URL query params
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const searchParams = new URLSearchParams(window.location.search);
+      const pollId = searchParams.get('poll');
+      
+      if (pollId && user) {
+        // Fetch the poll details and show response dialog
+        const fetchPoll = async () => {
+          try {
+            const { data: poll, error } = await supabase
+              .from('polls')
+              .select('*')
+              .eq('id', pollId)
+              .single();
+            
+            if (error) {
+              console.error('Error fetching poll:', error);
+              return;
+            }
+            
+            if (poll) {
+              setActiveWellnessPoll(poll);
+              
+              // Set default response value in the middle of the range
+              const middleValue = Math.floor((poll.min_value + poll.max_value) / 2);
+              setPollResponse(middleValue);
+            }
+          } catch (err) {
+            console.error('Error in fetchPoll:', err);
+          }
+        };
+        
+        fetchPoll();
+        
+        // Clean up the URL to remove the poll parameter
+        const newUrl = `${window.location.pathname}${
+          window.location.search
+            .replace(/[?&]poll=[^&]+/, '')
+            .replace(/^&/, '?')
+        }`;
+        
+        window.history.replaceState({}, '', newUrl);
+      }
+    }
+  }, [user]);
+
+  // Add this effect to fetch poll results when entering wellness view
+  useEffect(() => {
+    if (showWellnessView) {
+      fetchPollResults();
+    }
+  }, [showWellnessView, channel?.id, user?.id]);
+
+  // Add this function to fetch the original poll
+  const fetchOriginalPoll = async (pollId: string) => {
+    if (!user) return null;
+    
+    try {
+      const { data: poll, error } = await supabase
+        .from('polls')
+        .select('*')
+        .eq('id', pollId)
+        .single();
+        
+      if (error) {
+        console.error('Error fetching poll:', error);
+        return null;
+      }
+      
+      return poll;
+    } catch (err) {
+      console.error('Error in fetchOriginalPoll:', err);
+      return null;
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex min-h-screen flex-col">
@@ -1327,6 +1578,15 @@ export default function ChannelPage() {
                 <Package className="h-4 w-4 sm:mr-1" />
                 <span className="hidden sm:inline">Supplies</span>
               </Button>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="flex-shrink-0 px-2 sm:px-3 rounded-full transition-colors hover:bg-purple-100 hover:text-purple-700 hover:border-purple-300 dark:hover:bg-purple-800/30 dark:hover:text-purple-400"
+                onClick={() => setShowWellnessView(true)}
+              >
+                <Activity className="h-4 w-4 sm:mr-1" />
+                <span className="hidden sm:inline">Wellness</span>
+              </Button>
               <Dialog>
                 <DialogTrigger asChild>
                   <Button variant="outline" size="sm" className="flex-shrink-0 px-2 sm:px-3 rounded-full transition-colors hover:bg-purple-100 hover:text-purple-700 hover:border-purple-300 dark:hover:bg-purple-800/30 dark:hover:text-purple-400">
@@ -1429,7 +1689,251 @@ export default function ChannelPage() {
           <div className="flex-1 flex flex-col">
             <div className="flex-1 overflow-y-auto p-4">
               {/* Conditional rendering for chat or supplies view */}
-              {showSuppliesView ? (
+              {showWellnessView ? (
+                <div className="flex-1 flex flex-col h-full">
+                  <div className="border-b py-2 px-4 flex items-center justify-between">
+                    <div className="flex items-center">
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="rounded-full hover:bg-amber-100 hover:text-amber-700 dark:hover:bg-amber-800/30 dark:hover:text-amber-400 mr-2 transition-colors"
+                        onClick={() => setShowWellnessView(false)}
+                      >
+                        <ArrowLeft className="h-5 w-5" />
+                      </Button>
+                      <h2 className="font-semibold">Wellness Check</h2>
+                    </div>
+                    
+                    {isAdmin && (
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => setShowCreatePollForm(true)}
+                        className="flex-shrink-0"
+                      >
+                        <BellRing className="h-4 w-4 mr-2" />
+                        New Wellness Poll
+                      </Button>
+                    )}
+                  </div>
+                  
+                  <div className="overflow-y-auto flex-1 p-4">
+                    <div className="max-w-3xl mx-auto">
+                      {loadingPollResults ? (
+                        <div className="flex justify-center p-8">
+                          <div className="animate-pulse">Loading wellness data...</div>
+                        </div>
+                      ) : pollResults.length === 0 ? (
+                        <div className="text-center py-12 border rounded-lg bg-muted/20">
+                          <div className="mb-2 text-muted-foreground">
+                            <BarChart4 className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                            No wellness polls available
+                          </div>
+                          <p className="text-sm text-muted-foreground mb-6">
+                            {isAdmin 
+                              ? "Create a wellness poll to check on your group members" 
+                              : "No wellness polls have been created for this channel yet"
+                            }
+                          </p>
+                          {isAdmin && (
+                            <Button 
+                              onClick={() => setShowCreatePollForm(true)}
+                              className="mx-auto"
+                            >
+                              Create Wellness Poll
+                            </Button>
+                          )}
+                        </div>
+                      ) : (
+                        // Poll results display - both admin and members can see this
+                        <div className="space-y-8">
+                          {pollResults.map((poll) => (
+                            <div key={poll.id} className="border rounded-lg overflow-hidden">
+                              {/* Poll header - visible to all */}
+                              <div className="bg-card p-4 border-b">
+                                <div className="flex justify-between items-start">
+                                  <div>
+                                    <h3 className="font-medium text-lg">{poll.title}</h3>
+                                    {poll.description && (
+                                      <p className="text-muted-foreground mt-1">{poll.description}</p>
+                                    )}
+                                    <div className="text-xs text-muted-foreground mt-2">
+                                      {timeAgo(poll.createdAt)}
+                                    </div>
+                                  </div>
+                                  <div className="bg-blue-50 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300 px-3 py-1 rounded-full text-xs font-medium">
+                                    {poll.stats.total} responses
+                                  </div>
+                                </div>
+                              </div>
+                            
+                              {/* Poll content - different for admin vs member */}
+                              <div className="p-4 bg-muted/10">
+                                <div className="flex flex-col gap-4">
+                                  {/* Data visualization - visible to all */}
+                                  <div className="p-4 bg-background rounded-md border">
+                                    <h4 className="font-medium mb-2 flex items-center gap-2">
+                                      <span className="bg-muted-foreground/20 p-1 rounded">
+                                        <LineChart className="h-4 w-4" />
+                                      </span>
+                                      Average: {poll.stats.average} 
+                                      <span className="text-xs text-muted-foreground ml-1">
+                                        (scale {poll.minValue}-{poll.maxValue})
+                                      </span>
+                                    </h4>
+                                  
+                                    <div className="mt-4">
+                                      <div className="grid grid-cols-5 gap-1">
+                                        {Object.entries(poll.stats.distribution).map(([value, count]) => {
+                                          const percentage = poll.stats.total > 0 
+                                            ? Math.round((count / poll.stats.total) * 100) 
+                                            : 0;
+                                          return (
+                                            <div key={value} className="flex flex-col items-center">
+                                              <div className="w-full bg-muted rounded-sm overflow-hidden">
+                                                <div 
+                                                  className="bg-blue-500 h-24" 
+                                                  style={{ height: `${Math.max(4, percentage)}%` }}
+                                                />
+                                              </div>
+                                              <div className="text-xs mt-1">{value}</div>
+                                              <div className="text-xs text-muted-foreground">{count}</div>
+                                            </div>
+                                          );
+                                        })}
+                                      </div>
+                                    </div>
+                                  </div>
+                                
+                                  {isAdmin && (
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                      {/* Responded members */}
+                                      <div className="p-4 bg-background rounded-md border">
+                                        <h4 className="font-medium mb-3">Responded ({poll.respondedMembers.length})</h4>
+                                        <div className="max-h-60 overflow-y-auto space-y-2">
+                                          {poll.respondedMembers.map((member) => (
+                                            <div key={member.userId} className="flex items-center justify-between py-2 border-b last:border-0">
+                                              <div className="flex items-center gap-2">
+                                                <Avatar className="h-6 w-6">
+                                                  <AvatarImage src={member.avatarUrl || ""} />
+                                                  <AvatarFallback>
+                                                    {member.fullName?.[0] || "?"}
+                                                  </AvatarFallback>
+                                                </Avatar>
+                                                <div>
+                                                  <div className="text-sm font-medium">{member.fullName}</div>
+                                                  {member.comment && (
+                                                    <div className="text-xs text-muted-foreground mt-0.5">
+                                                      "{member.comment}"
+                                                    </div>
+                                                  )}
+                                                </div>
+                                              </div>
+                                              <div className="bg-blue-50 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300 px-2 py-0.5 rounded-full text-xs font-medium">
+                                                {member.responseValue}
+                                              </div>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      </div>
+                                      
+                                      {/* Non-responded members */}
+                                      <div className="p-4 bg-background rounded-md border">
+                                        <h4 className="font-medium mb-3">
+                                          <span className={poll.nonRespondedMembers.length > 0 ? "text-amber-600" : ""}>
+                                            Not Responded ({poll.nonRespondedMembers.length})
+                                          </span>
+                                        </h4>
+                                        {poll.nonRespondedMembers.length > 0 ? (
+                                          <div className="max-h-60 overflow-y-auto space-y-2">
+                                            {poll.nonRespondedMembers.map((member) => (
+                                              <div key={member.userId} className="flex items-center gap-2 py-2 border-b last:border-0">
+                                                <Avatar className="h-6 w-6">
+                                                  <AvatarImage src={member.avatarUrl || ""} />
+                                                  <AvatarFallback>
+                                                    {member.fullName?.[0] || "?"}
+                                                  </AvatarFallback>
+                                                </Avatar>
+                                                <div className="text-sm">{member.fullName}</div>
+                                              </div>
+                                            ))}
+                                          </div>
+                                        ) : (
+                                          <div className="text-center py-6 text-muted-foreground">
+                                            <div className="text-green-600 text-sm font-medium">
+                                              ✓ Everyone has responded
+                                            </div>
+                                          </div>
+                                        )}
+                                      </div>
+                                    </div>
+                                  )}
+                                  
+                                  {/* Member view - simplified with own response */}
+                                  {!isAdmin && (
+                                    <div className="p-4 bg-background rounded-md border">
+                                      <h4 className="font-medium mb-3">Your Team's Wellness</h4>
+                                      <p className="text-sm text-muted-foreground mb-4">
+                                        This poll has received responses from {poll.respondedMembers.length} team members.
+                                        {poll.nonRespondedMembers.length > 0 && ` There are still ${poll.nonRespondedMembers.length} members who haven't responded yet.`}
+                                      </p>
+                                      
+                                      {/* Show member's own response if they've responded */}
+                                      {poll.respondedMembers.find(m => m.userId === user?.id) && (
+                                        <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-md">
+                                          <h5 className="text-sm font-medium text-blue-800 dark:text-blue-300 mb-1">Your Response</h5>
+                                          <div className="flex items-center justify-between">
+                                            <span className="text-sm">
+                                              You rated: <strong>{poll.respondedMembers.find(m => m.userId === user?.id)?.responseValue}</strong>
+                                            </span>
+                                            <Button 
+                                              variant="outline" 
+                                              size="sm"
+                                              onClick={async () => {
+                                                const originalPoll = await fetchOriginalPoll(poll.id);
+                                                if (originalPoll) {
+                                                  setActiveWellnessPoll(originalPoll);
+                                                  const userResponse = poll.respondedMembers.find(m => m.userId === user?.id);
+                                                  if (userResponse) {
+                                                    setPollResponse(userResponse.responseValue);
+                                                    setPollComment(userResponse.comment || '');
+                                                  }
+                                                }
+                                              }}
+                                            >
+                                              Update Response
+                                            </Button>
+                                          </div>
+                                        </div>
+                                      )}
+                                      
+                                      {/* Show respond button if they haven't responded yet */}
+                                      {!poll.respondedMembers.find(m => m.userId === user?.id) && (
+                                        <div className="mt-4 text-center">
+                                          <Button
+                                            onClick={async () => {
+                                              const originalPoll = await fetchOriginalPoll(poll.id);
+                                              if (originalPoll) {
+                                                setActiveWellnessPoll(originalPoll);
+                                              }
+                                            }}
+                                          >
+                                            Respond to Poll
+                                          </Button>
+                                        </div>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ) : showSuppliesView ? (
                 <div className="flex-1 flex flex-col h-full">
                   <div className="border-b py-2 px-4 flex items-center justify-between">
                     <div className="flex items-center">
@@ -1850,6 +2354,159 @@ export default function ChannelPage() {
           </div>
         </div>
       </main>
+      
+      {/* Create Poll Modal */}
+      <Dialog open={showCreatePollForm} onOpenChange={setShowCreatePollForm}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Create Wellness Poll</DialogTitle>
+            <DialogDescription>
+              Create a new wellness check poll for channel members
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={createWellnessPoll}>
+            <div className="space-y-4 pt-4">
+              <div className="space-y-2">
+                <label htmlFor="poll-title" className="text-sm font-medium">
+                  Poll Title
+                </label>
+                <Input
+                  id="poll-title"
+                  placeholder="e.g., Daily Wellness Check"
+                  value={newPollTitle}
+                  onChange={(e) => setNewPollTitle(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <label htmlFor="poll-description" className="text-sm font-medium">
+                  Description (optional)
+                </label>
+                <Textarea
+                  id="poll-description"
+                  placeholder="How are you feeling today? Rate your wellness from 1-5"
+                  value={newPollDescription}
+                  onChange={(e) => setNewPollDescription(e.target.value)}
+                  className="min-h-[100px]"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label htmlFor="min-value" className="text-sm font-medium">
+                    Minimum Value
+                  </label>
+                  <Input
+                    id="min-value"
+                    type="number"
+                    min="1"
+                    max="9"
+                    value={minPollValue}
+                    onChange={(e) => setMinPollValue(parseInt(e.target.value, 10))}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label htmlFor="max-value" className="text-sm font-medium">
+                    Maximum Value
+                  </label>
+                  <Input
+                    id="max-value"
+                    type="number"
+                    min="2"
+                    max="10"
+                    value={maxPollValue}
+                    onChange={(e) => setMaxPollValue(parseInt(e.target.value, 10))}
+                  />
+                </div>
+              </div>
+            </div>
+            <DialogFooter className="mt-6">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setShowCreatePollForm(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                disabled={isSending || !newPollTitle.trim() || minPollValue >= maxPollValue}
+              >
+                Create Poll
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Respond to Poll Modal */}
+      <Dialog open={!!activeWellnessPoll} onOpenChange={(open) => !open && setActiveWellnessPoll(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Wellness Check</DialogTitle>
+            {activeWellnessPoll?.description && (
+              <DialogDescription>
+                {activeWellnessPoll.description}
+              </DialogDescription>
+            )}
+          </DialogHeader>
+          <div className="py-4">
+            <h3 className="text-lg font-medium mb-2">{activeWellnessPoll?.title}</h3>
+            
+            <div className="my-6">
+              <div className="flex justify-center items-center gap-4 mb-2">
+                <span className="text-sm font-medium">{activeWellnessPoll?.min_value || 1}</span>
+                <div className="flex-1 flex items-center">
+                  {Array.from({ length: (activeWellnessPoll?.max_value || 5) - (activeWellnessPoll?.min_value || 1) + 1 }).map((_, i) => {
+                    const value = (activeWellnessPoll?.min_value || 1) + i;
+                    return (
+                      <button
+                        key={i}
+                        type="button"
+                        onClick={() => setPollResponse(value)}
+                        className={`flex-1 h-12 flex items-center justify-center rounded-full mx-1 ${
+                          pollResponse === value
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-muted hover:bg-muted/80'
+                        }`}
+                      >
+                        {value}
+                      </button>
+                    );
+                  })}
+                </div>
+                <span className="text-sm font-medium">{activeWellnessPoll?.max_value || 5}</span>
+              </div>
+            </div>
+            
+            <div className="mt-4">
+              <label htmlFor="poll-comment" className="text-sm font-medium block mb-2">
+                Additional Comments (optional)
+              </label>
+              <Textarea
+                id="poll-comment"
+                placeholder="Share how you're doing..."
+                value={pollComment}
+                onChange={(e) => setPollComment(e.target.value)}
+                className="min-h-[100px]"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              onClick={() => setActiveWellnessPoll(null)}
+              variant="outline"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => activeWellnessPoll && respondToPoll(activeWellnessPoll.id)}
+              disabled={isSending}
+            >
+              Submit Response
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

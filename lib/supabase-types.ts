@@ -119,6 +119,70 @@ export interface Database {
           has_attachment?: boolean
         }
       }
+      polls: {
+        Row: {
+          id: string
+          channel_id: string
+          created_by: string
+          title: string
+          description: string | null
+          poll_type: "wellness"
+          min_value: number
+          max_value: number
+          created_at: string
+          expires_at: string | null
+        }
+        Insert: {
+          id?: string
+          channel_id: string
+          created_by: string
+          title: string
+          description?: string | null
+          poll_type?: "wellness"
+          min_value?: number
+          max_value?: number
+          created_at?: string
+          expires_at?: string | null
+        }
+        Update: {
+          id?: string
+          channel_id?: string
+          created_by?: string
+          title?: string
+          description?: string | null
+          poll_type?: "wellness"
+          min_value?: number
+          max_value?: number
+          created_at?: string
+          expires_at?: string | null
+        }
+      }
+      poll_responses: {
+        Row: {
+          id: string
+          poll_id: string
+          user_id: string
+          response_value: number
+          comment: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          poll_id: string
+          user_id: string
+          response_value: number
+          comment?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          poll_id?: string
+          user_id?: string
+          response_value?: number
+          comment?: string | null
+          created_at?: string
+        }
+      }
       profiles: {
         Row: {
           id: string
