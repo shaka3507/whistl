@@ -28,7 +28,8 @@ import {
   AlertCircle,
   Activity,
   BarChart4,
-  LineChart
+  LineChart,
+  Check
 } from "lucide-react";
 import {
   Dialog,
@@ -46,6 +47,14 @@ import {
   subscribeToPushNotifications 
 } from '@/lib/pushNotifications';
 import { Switch } from "@/components/ui/switch";
+import { 
+  Heart, 
+  Menu,
+  X,
+  PanelLeft,
+  Pencil,
+  Plus
+} from "lucide-react";
 
 type Channel = Database["public"]["Tables"]["channels"]["Row"];
 type Alert = Database["public"]["Tables"]["alerts"]["Row"] & {
@@ -527,174 +536,62 @@ export default function ChannelPage() {
       setIsSending(true);
       setError(null);
       
-      // Normalize the email (trim and convert to lowercase)
-      const normalizedEmail = inviteEmail.trim().toLowerCase();
-      console.log("Looking up user with email:", normalizedEmail);
+      console.log("Sending invitation to:", inviteEmail.trim());
       
-      // Try multiple approaches to find the user in profiles
-      
-      // Approach 1: Exact match with email
-      let { data: userData, error: userError } = await supabase
-        .from("profiles")
-        .select("id, email, full_name")
-        .eq("email", normalizedEmail)
-        .maybeSingle();
-      
-      // If no match, try case-insensitive with ilike
-      if (!userData && !userError) {
-        console.log("No exact match, trying case-insensitive match");
-        const { data: ilikeuserData, error: ilikeError } = await supabase
-          .from("profiles")
-          .select("id, email, full_name")
-          .ilike("email", normalizedEmail)
-          .maybeSingle();
-          
-        if (!ilikeError) {
-          userData = ilikeuserData;
-        }
-      }
-      
-      // If still no match, look for partial matches
-      if (!userData && !userError) {
-        console.log("Trying with partial match");
-        const { data: partialMatches, error: partialError } = await supabase
-          .from("profiles")
-          .select("id, email, full_name")
-          .ilike("email", `%${normalizedEmail}%`)
-          .limit(5);
-        
-        if (!partialError && partialMatches && partialMatches.length > 0) {
-          console.log("Found partial matches:", partialMatches.map(u => u.email));
-          
-          // If only one match, use it
-          if (partialMatches.length === 1) {
-            userData = partialMatches[0];
-          } else {
-            // If multiple matches, throw a specific error
-            throw new Error(`Multiple users found with similar emails. Please use the exact email: ${
-              partialMatches.map(u => u.email).join(", ")
-            }`);
-          }
-        }
-      }
-      
-      // Last try - check with email as substring
-      if (!userData && !userError) {
-        console.log("Checking if email is stored with spaces or different formatting");
-        // Get all profiles and filter manually (as a last resort)
-        const { data: allProfiles, error: allProfilesError } = await supabase
-          .from("profiles")
-          .select("id, email, full_name")
-          .limit(100);
-          
-        if (!allProfilesError && allProfiles && allProfiles.length > 0) {
-          const potentialMatches = allProfiles.filter(profile => 
-            profile.email && 
-            profile.email.toLowerCase().includes(normalizedEmail)
-          );
-          
-          if (potentialMatches.length === 1) {
-            userData = potentialMatches[0];
-            console.log("Found match with email as substring:", userData.email);
-          } else if (potentialMatches.length > 1) {
-            throw new Error(`Multiple users found with similar emails. Please use the exact email: ${
-              potentialMatches.map(u => u.email).join(", ")
-            }`);
-          }
-        }
-      }
-
-      if (userError) {
-        console.error("Database error during user lookup:", userError);
-        throw new Error(`Error looking up user: ${userError.message}`);
-      }
-      
-      if (!userData) {
-        // Show a sample of users to help debugging
-        const { data: sampleUsers, error: sampleError } = await supabase
-          .from("profiles")
-          .select("email")
-          .limit(5);
-          
-        if (!sampleError && sampleUsers && sampleUsers.length > 0) {
-          console.log("Sample of available users:", sampleUsers.map(u => u.email));
-        }
-        
-        throw new Error(`No user found with email: ${normalizedEmail}. The user must have a profile in the system.`);
-      }
-
-      console.log("Found user:", userData.email, userData.id);
-
-      // Check if user is already a member of the channel
-      const { data: existingMember, error: memberCheckError } = await supabase
-        .from("channel_members")
-        .select("id")
-        .eq("channel_id", channel.id)
-        .eq("user_id", userData.id)
-        .maybeSingle();
-        
-      if (memberCheckError) {
-        console.error("Error checking existing membership:", memberCheckError);
-      }
-      
-      if (existingMember) {
-        throw new Error(`User ${userData.email} is already a member of this channel`);
-      }
-
-      console.log("Adding user to channel:", userData.email, "->", channel.id);
-      
-      // Add the user to the channel
-      const { error: memberError } = await supabase
-        .from("channel_members")
-        .insert({
-          channel_id: channel.id,
-          user_id: userData.id,
-          role: "member", // or any appropriate role
-        });
-
-      if (memberError) {
-        console.error("Error adding member:", memberError);
-        
-        // Check if it's a unique constraint violation (user already added)
-        if (memberError.code === '23505') {
-          throw new Error("This user is already a member of the channel");
-        } else {
-          throw new Error(`Failed to add user to the channel: ${memberError.message}`);
-        }
-      }
-
-      // Send a notification message to the channel about the addition
-      await supabase.from("messages").insert({
-        channel_id: channel.id,
-        user_id: user.id,
-        content: `${userData.full_name || userData.email} has been added to the channel.`,
-        is_notification: true,
+      // Call the new invite API endpoint
+      const response = await fetch('/api/send-invite', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: inviteEmail.trim(),
+          channelId: channel.id,
+          userId: user.id, // Include user ID explicitly in case auth is an issue
+        }),
+        credentials: 'same-origin'
       });
 
-      // Success - show message and clear the input
-      setError(`Successfully added ${userData.full_name || userData.email} to the channel`);
-      setInviteEmail("");
+      const result = await response.json();
       
-      // Refresh members list
-      const { data: membersData } = await supabase
-        .from("channel_members")
-        .select(
-          `
-          *,
-          profiles(*)
-        `
-        )
-        .eq("channel_id", id);
-        
-      if (membersData) {
-        setMembers(membersData);
+      if (!response.ok) {
+        console.error("Invitation API error:", result);
+        throw new Error(result.error || `Failed to send invitation: ${response.status}`);
       }
 
-      // Log success message
-      console.log(`User ${userData.email} has been added to the channel.`);
+      console.log("Invitation result:", result);
+
+      // Success - show message and clear the input
+      // Set message with a success type (will display in green)
+      setError(result.message);
+      setInviteEmail("");
+      
+      // If we have an invitation URL in development mode, show it
+      if (result.invitationUrl) {
+        console.log("Invitation URL:", result.invitationUrl);
+        // For development purposes, add the URL to the success message
+        setError(prev => `${prev || ''} Development URL: ${result.invitationUrl}`);
+      }
+      
+      // Refresh members list after successful invite
+      if (result.message.includes('added to the channel')) {
+        const { data: membersData } = await supabase
+          .from("channel_members")
+          .select(
+            `
+            *,
+            profiles(*)
+          `
+          )
+          .eq("channel_id", id);
+          
+        if (membersData) {
+          setMembers(membersData);
+        }
+      }
       
       // Clear success message after a few seconds
-      setTimeout(() => setError(null), 5000);
+      setTimeout(() => setError(null), 10000); // Show message longer for development
     } catch (err: any) {
       console.error("Error inviting user:", err);
       setError(err.message || "Failed to add user to the channel");
@@ -1625,6 +1522,25 @@ export default function ChannelPage() {
                       </div>
                     ))}
                   </div>
+                  
+                  {/* Display error or success message */}
+                  {error && (
+                    <div className={`rounded-md p-3 mt-3 break-words ${error.toLowerCase().includes('failed') || error.toLowerCase().includes('error') ? 'bg-red-50 text-red-800' : 'bg-green-50 text-green-800'}`}>
+                      <div className="flex items-start">
+                        <div className="flex-shrink-0">
+                          {error.toLowerCase().includes('failed') || error.toLowerCase().includes('error') ? (
+                            <AlertTriangle className="h-5 w-5 text-red-400" />
+                          ) : (
+                            <Check className="h-5 w-5 text-green-400" />
+                          )}
+                        </div>
+                        <div className="ml-3">
+                          <p className="text-sm font-medium">{error}</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  
                   {isAdmin && (
                     <>
                     <form onSubmit={handleInviteUser} className="mt-4">

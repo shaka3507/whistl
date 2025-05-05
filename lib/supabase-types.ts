@@ -209,6 +209,41 @@ export interface Database {
           phone_number?: string | null
         }
       }
+      invitations: {
+        Row: {
+          id: string
+          email: string
+          channel_id: string
+          invited_by: string
+          created_at: string
+          expires_at: string
+          invitation_token: string
+          redeemed_at: string | null
+          redeemed_by: string | null
+        }
+        Insert: {
+          id?: string
+          email: string
+          channel_id: string
+          invited_by: string
+          created_at?: string
+          expires_at?: string
+          invitation_token: string
+          redeemed_at?: string | null
+          redeemed_by?: string | null
+        }
+        Update: {
+          id?: string
+          email?: string
+          channel_id?: string
+          invited_by?: string
+          created_at?: string
+          expires_at?: string
+          invitation_token?: string
+          redeemed_at?: string | null
+          redeemed_by?: string | null
+        }
+      }
     }
     Views: {
       [_ in never]: never
