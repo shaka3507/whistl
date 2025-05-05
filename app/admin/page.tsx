@@ -610,17 +610,6 @@ export default function AdminPage() {
                           </Button>
                         </div>
                       </CardHeader>
-                      <CardContent>
-                        <div className="space-y-4">
-                          
-                          <div className="border-t pt-4">
-                            <h4 className="text-sm font-medium mb-2">Claimed Items</h4>
-                            <div className="text-sm text-muted-foreground">
-                              <p>Item claiming functionality will be implemented in a future update.</p>
-                            </div>
-                          </div>
-                        </div>
-                      </CardContent>
                     </Card>
                   ))}
                 </div>

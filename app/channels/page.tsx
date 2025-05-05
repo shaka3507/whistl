@@ -36,6 +36,7 @@ export default function ChannelsPage() {
   const [channels, setChannels] = useState<Channel[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [claimingItems, setClaimingItems] = useState<Set<string>>(new Set())
   const router = useRouter()
 
   useEffect(() => {
@@ -71,16 +72,33 @@ export default function ChannelsPage() {
 
   const handleClaimItem = async (channelId: string, alertId: string, itemId: string) => {
     if (!user) return
-
+    
+    // Prevent multiple clicks by checking if this item is already being claimed
+    if (claimingItems.has(itemId)) return
+    
     try {
-      const { error } = await supabase
+      // Set the loading state for this item
+      setClaimingItems(prev => new Set([...prev, itemId]))
+      
+      // Use a conditional update that only succeeds if claimed_by is currently null
+      const { error, data } = await supabase
         .from("alert_items")
         .update({ claimed_by: user.id })
         .eq("id", itemId)
         .eq("alert_id", alertId)
         .eq("channel_id", channelId)
+        .is("claimed_by", null) // Only update if claimed_by is null
+        .select()
 
       if (error) throw error
+      
+      // Check if the update was successful by seeing if any rows were affected
+      if (!data || data.length === 0) {
+        // Item was already claimed by someone else
+        console.log("Item already claimed by another user")
+        // You could add user feedback here (like a toast notification)
+        return
+      }
 
       // Refresh the channels data
       const { data: updatedChannels, error: channelError } = await supabase
@@ -112,6 +130,13 @@ export default function ChannelsPage() {
       setChannels(updatedChannels || [])
     } catch (error) {
       console.error("Error claiming item:", error)
+    } finally {
+      // Always remove the loading state when done, whether successful or not
+      setClaimingItems(prev => {
+        const updatedSet = new Set(prev)
+        updatedSet.delete(itemId)
+        return updatedSet
+      })
     }
   }
 

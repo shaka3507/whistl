@@ -176,6 +176,7 @@ export default function ChannelPage() {
   const [justClaimedItems, setJustClaimedItems] = useState<Set<string>>(new Set());
   const [userClaimedItems, setUserClaimedItems] = useState<Set<string>>(new Set());
   const [showUserItems, setShowUserItems] = useState<boolean>(true);
+  const [claimingItemIds, setClaimingItemIds] = useState<Set<string>>(new Set());
   const { toast } = useToast();
 
   // Check if running on localhost
@@ -791,6 +792,12 @@ export default function ChannelPage() {
       return;
     }
 
+    // Check if item is already being claimed
+    if (claimingItemIds.has(itemId)) {
+      console.log("Item is already being claimed");
+      return;
+    }
+
     const currentClaimed = claimedItems[itemId] || 0;
     if (currentClaimed >= item.quantity) {
       console.log("Item already fully claimed");
@@ -811,6 +818,9 @@ export default function ChannelPage() {
     console.log("Claiming item:", item.name, "for alert ID:", alert.id);
     
     try {
+      // Set claiming state
+      setClaimingItemIds(prev => new Set([...prev, itemId]));
+      
       const claimedQuantity = currentClaimed + 1;
       
       // Prepare request body with all required fields
@@ -908,6 +918,13 @@ export default function ChannelPage() {
         title: "Error",
         description: "Something went wrong when claiming the item",
         variant: "destructive",
+      });
+    } finally {
+      // Remove from claiming state regardless of outcome
+      setClaimingItemIds(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(itemId);
+        return newSet;
       });
     }
   };
@@ -2063,15 +2080,24 @@ export default function ChannelPage() {
                               {remainingQuantity > 0 ? (
                                 <Button
                                   onClick={() => claimSupplyItem(item.id)}
-                                  disabled={remainingQuantity <= 0 || hasJustClaimed || userHasClaimed}
+                                  disabled={remainingQuantity <= 0 || hasJustClaimed || userHasClaimed || claimingItemIds.has(item.id)}
                                   size="sm"
                                   className={`rounded-full px-4 ${(hasJustClaimed || userHasClaimed) ? 'bg-green-700' : 'bg-green-500'}`}
                                 >
-                                  {(hasJustClaimed || userHasClaimed) ? 'Claimed' : 'Claim'}
+                                  {claimingItemIds.has(item.id) ? (
+                                    <>
+                                      <span className="animate-spin mr-2 h-4 w-4 border-b-2 border-white rounded-full inline-block"></span>
+                                      Claiming...
+                                    </>
+                                  ) : (hasJustClaimed || userHasClaimed) ? (
+                                    'Claimed'
+                                  ) : (
+                                    'Claim'
+                                  )}
                                 </Button>
                               ) : (
                                 <span className="text-muted-foreground text-sm bg-muted px-3 py-1 rounded-full inline-block">
-                                  Out of stock
+                                  not available
                                 </span>
                               )}
                             </div>
