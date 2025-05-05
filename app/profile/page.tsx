@@ -7,12 +7,13 @@ import { Header } from "@/components/header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2, Upload, User, ExternalLink } from "lucide-react";
+import { Loader2, Upload, User, ExternalLink, Bell } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { toast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { PostgrestError } from "@supabase/supabase-js";
+import { Switch } from "@/components/ui/switch";
 
 export default function ProfilePage() {
   const { user, profile, updateProfile } = useAuth();
@@ -27,6 +28,7 @@ export default function ProfilePage() {
   const [notes, setNotes] = useState("");
   const [importantDocuments, setImportantDocuments] = useState<File | null>(null);
   const [safeSpaceAddress, setSafeSpaceAddress] = useState("");
+  const [emailNotifications, setEmailNotifications] = useState(false);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
 
   useEffect(() => {
@@ -39,6 +41,7 @@ export default function ProfilePage() {
       setFullName(profile.full_name || "");
       setUsername(profile.username || "");
       setAvatarUrl(profile.avatar_url || "");
+      setEmailNotifications(profile.email_notifications || false);
     }
     setIsCheckingAuth(false);
   }, [user, profile, router]);
@@ -96,10 +99,18 @@ export default function ProfilePage() {
     setIsLoading(true);
 
     try {
-      const { error } = await updateProfile({
+      // Only include email_notifications if it exists in the profile schema
+      const updates = {
         full_name: fullName,
         username,
-      });
+      };
+      
+      // Check if email_notifications exists in the profile before including it
+      if (profile && 'email_notifications' in profile) {
+        (updates as any).email_notifications = emailNotifications;
+      }
+
+      const { error } = await updateProfile(updates);
 
       if (error) throw error;
 
@@ -235,6 +246,19 @@ export default function ProfilePage() {
                   type="file"
                   onChange={handleDocumentUpload}
                   className="w-full"
+                />
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label htmlFor="emailNotifications">Email Notifications</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Receive email notifications for alerts, messages, and polls
+                  </p>
+                </div>
+                <Switch
+                  id="emailNotifications"
+                  checked={emailNotifications}
+                  onCheckedChange={setEmailNotifications}
                 />
               </div>
               <div className="space-y-2">

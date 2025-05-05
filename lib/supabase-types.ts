@@ -191,6 +191,7 @@ export interface Database {
           avatar_url: string | null
           updated_at: string
           phone_number: string | null
+          email_notifications: boolean
         }
         Insert: {
           id: string
@@ -199,6 +200,7 @@ export interface Database {
           avatar_url?: string | null
           updated_at?: string
           phone_number?: string | null
+          email_notifications?: boolean
         }
         Update: {
           id?: string
@@ -207,6 +209,7 @@ export interface Database {
           avatar_url?: string | null
           updated_at?: string
           phone_number?: string | null
+          email_notifications?: boolean
         }
       }
       invitations: {

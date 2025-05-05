@@ -2,6 +2,12 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from '@/lib/supabase-types';
 import webpush from 'web-push';
+import axios from 'axios';
+
+// App URL for links in notifications
+const APP_URL = process.env.NODE_ENV === 'production' 
+  ? 'https://whistl.vercel.app'
+  : process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 
 // VAPID keys for web push
 const VAPID_PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || 'BMR_S873mOj37k8T-je1GF-WDgvvnUfH7rfGslAJrZwEi1rF9NzP3HRuGQG07oLc7MRmZH8jF2p-kzpTPQeyF7Y';
@@ -25,7 +31,8 @@ export async function POST(request: Request) {
       description,
       minValue = 1,
       maxValue = 5,
-      sendPushNotification = true
+      sendPushNotification = true,
+      sendEmailNotification = true
     } = body;
 
     // Validate required fields
@@ -73,6 +80,15 @@ export async function POST(request: Request) {
       .single();
 
     const adminName = userProfile?.full_name || 'An admin';
+
+    // Get channel name
+    const { data: channel } = await supabaseAdmin
+      .from('channels')
+      .select('name')
+      .eq('id', channelId)
+      .single();
+
+    const channelName = channel?.name || 'a channel';
 
     // Create the poll
     const { data: poll, error: pollError } = await supabaseAdmin
@@ -171,10 +187,39 @@ export async function POST(request: Request) {
       }
     }
 
+    // If sendEmailNotification is true, send email notifications to channel members
+    let emailNotificationResult = null;
+    if (sendEmailNotification) {
+      try {
+        // Create the poll link
+        const pollLink = `${APP_URL}/channels/${channelId}?poll=${poll.id}`;
+        
+        // Prepare email text
+        const emailText = `${adminName} created a new wellness check poll in channel "${channelName}": ${title}\n\n${description || ''}\n\nPlease respond to this wellness check: ${pollLink}`;
+        
+        // Send email notifications (don't await to avoid blocking response)
+        emailNotificationResult = axios.post('/api/send-channel-email-notifications', {
+          channelId,
+          subject: `New Wellness Check Poll in ${channelName}`,
+          text: emailText,
+          excludeUserId: userId // Don't send to the creator
+        }).catch(error => {
+          console.error('Error sending email notifications:', error);
+          return { error: true, message: error.message };
+        });
+      } catch (emailError) {
+        console.error('Error preparing email notifications:', emailError);
+      }
+    }
+
     return NextResponse.json({
       success: true,
       poll,
       message,
+      notifications: {
+        push: sendPushNotification ? 'sent' : 'skipped',
+        email: sendEmailNotification ? 'queued' : 'skipped'
+      }
     });
   } catch (error: any) {
     console.error('Error in create-wellness-poll API route:', error);
