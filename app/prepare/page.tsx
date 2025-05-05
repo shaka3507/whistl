@@ -8,7 +8,7 @@ import { Search, CheckCircle } from "lucide-react";
 import Link from "next/link";
 import { ChatAgent } from "@/components/chat-agent";
 import { FloatingChatButton } from "@/components/floating-chat-button";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 
 // Card data structure
@@ -21,6 +21,7 @@ interface CardData {
 
 export default function PreparePage() {
   const { slug } = useParams();
+  const router = useRouter();
   const [searchTerm, setSearchTerm] = useState("");
   const [completedModules, setCompletedModules] = useState<Set<string>>(
     new Set()
@@ -28,6 +29,7 @@ export default function PreparePage() {
   const [incompleteModules, setIncompleteModules] = useState<Set<string>>(
     new Set()
   );
+  const [refreshKey, setRefreshKey] = useState(0);
 
   // All cards data
   const allCards: CardData[] = [
@@ -94,6 +96,90 @@ export default function PreparePage() {
     },
   ];
 
+  // Refresh function for module completion statuses
+  async function fetchCompletionStatuses() {
+    // Get the user ID from Supabase auth
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      console.error("User not authenticated");
+      return;
+    }
+
+    console.log("Fetching latest module completion statuses");
+
+    // Fetch completion statuses for all modules
+    const { data, error } = await supabase
+      .from("module_progress")
+      .select("module_name, completed")
+      .eq("user_id", user.id);
+
+    if (error) {
+      console.error("Error fetching completion statuses:", error);
+      return;
+    }
+
+    // Create a set of completed module IDs
+    const completedSet = new Set(
+      data
+        .filter(
+          (entry: { module_name: string; completed: boolean }) =>
+            entry.completed
+        )
+        .map((entry: { module_name: string }) => entry.module_name)
+    );
+    setCompletedModules(completedSet);
+
+    // Create a set of incomplete module IDs
+    const incompleteSet = new Set(
+      data
+        .filter(
+          (entry: { module_name: string; completed: boolean }) =>
+            !entry.completed
+        )
+        .map((entry: { module_name: string }) => entry.module_name)
+    );
+    setIncompleteModules(incompleteSet);
+    
+    console.log("Updated completed modules:", completedSet);
+  }
+
+  // Initial data load
+  useEffect(() => {
+    fetchCompletionStatuses();
+  }, [refreshKey]);
+
+  // Add effect to force a refresh when the component is mounted (e.g. when navigating back)
+  useEffect(() => {
+    // Force a refresh when this component becomes visible
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        console.log('Page visible, refreshing data');
+        // Increment refreshKey to trigger the useEffect above
+        setRefreshKey(prev => prev + 1);
+      }
+    };
+
+    // Listen for visibility change events
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    // Refresh on initial load
+    fetchCompletionStatuses();
+    
+    // Add window focus event for when they return to the tab
+    window.addEventListener('focus', () => {
+      console.log('Window focused, refreshing completion data');
+      fetchCompletionStatuses();
+    });
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', fetchCompletionStatuses);
+    };
+  }, []);
+
   // Filter cards based on search term
   const filteredCards = useMemo(() => {
     if (!searchTerm.trim()) return allCards;
@@ -118,55 +204,6 @@ export default function PreparePage() {
 
   // Second row cards (non-modules)
   const secondRowCards = nonModuleCards;
-
-  useEffect(() => {
-    async function fetchCompletionStatuses() {
-      // Get the user ID from Supabase auth
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-
-      if (!user) {
-        console.error("User not authenticated");
-        return;
-      }
-
-      // Fetch completion statuses for all modules
-      const { data, error } = await supabase
-        .from("module_progress")
-        .select("module_name, completed")
-        .eq("user_id", user.id);
-
-      if (error) {
-        console.error("Error fetching completion statuses:", error);
-        return;
-      }
-
-      // Create a set of completed module IDs
-      const completedSet = new Set(
-        data
-          .filter(
-            (entry: { module_name: string; completed: boolean }) =>
-              entry.completed
-          )
-          .map((entry: { module_name: string }) => entry.module_name)
-      );
-      setCompletedModules(completedSet);
-
-      // Create a set of incomplete module IDs
-      const incompleteSet = new Set(
-        data
-          .filter(
-            (entry: { module_name: string; completed: boolean }) =>
-              !entry.completed
-          )
-          .map((entry: { module_name: string }) => entry.module_name)
-      );
-      setIncompleteModules(incompleteSet);
-    }
-
-    fetchCompletionStatuses();
-  }, []);
 
   // Calculate the completion percentage
   const totalModules = moduleCards.length;

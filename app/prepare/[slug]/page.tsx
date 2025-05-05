@@ -126,6 +126,10 @@ export default function PreparePage() {
   };
 
   const handleModalClose = async () => {
+    // Add this to fully trace the quiz completion flow in production
+    console.log("handleModalClose called with isQuizCompleted:", isQuizCompleted);
+    console.log("Current quizResults:", quizResults);
+    
     // Get the user ID from Supabase auth
     const {
       data: { user },
@@ -133,55 +137,96 @@ export default function PreparePage() {
 
     if (!user) {
       console.error("User not authenticated");
+      setIsQuizOpen(false);
       return;
     }
 
     try {
-      // Check if there's already a progress entry
-      const { data, error } = await supabase
-        .from("module_progress")
-        .select("completed")
-        .eq("module_name", slug)
-        .eq("user_id", user.id)
-        .single();
-
-      if (error && error.code !== 'PGRST116') { // PGRST116: No rows found
-        throw error;
-      }
-
-      if (!data) {
-        // Insert a new row with completed set to false
-        const { error: insertError } = await supabase
+      // Only save progress if the quiz was successfully completed
+      if (isQuizCompleted) {
+        console.log("Saving quiz completion for user:", user.id, "module:", slug);
+        
+        // Check if there's already a progress entry
+        const { data, error } = await supabase
           .from("module_progress")
-          .insert([{ module_name: slug, user_id: user.id, completed: true }]);
-
-        if (insertError) {
-          throw insertError;
-        }
-      } else if (!data.completed) {
-        // Update the existing row to set completed to true
-        const { error: updateError } = await supabase
-          .from("module_progress")
-          .update({ completed: true })
+          .select("completed")
           .eq("module_name", slug)
-          .eq("user_id", user.id);
+          .eq("user_id", user.id)
+          .single();
 
-        if (updateError) {
-          throw updateError;
+        if (error && error.code !== 'PGRST116') { // PGRST116: No rows found
+          console.error("Error checking existing progress:", error);
+          throw error;
         }
+
+        // Prepare timestamp for database
+        const timestamp = new Date().toISOString();
+        
+        if (!data) {
+          // Insert a new row with completed set to true
+          console.log("No existing entry found, creating new entry");
+          const { data: insertData, error: insertError } = await supabase
+            .from("module_progress")
+            .insert([{ 
+              module_name: slug, 
+              user_id: user.id, 
+              completed: true,
+              completed_at: timestamp,
+              score: quizResults.percentageCorrect 
+            }]);
+
+          if (insertError) {
+            console.error("Error inserting progress:", insertError);
+            throw insertError;
+          }
+          
+          console.log("Insert result:", insertData);
+        } else if (!data.completed) {
+          // Update the existing row to set completed to true
+          console.log("Existing entry found, updating to completed");
+          const { data: updateData, error: updateError } = await supabase
+            .from("module_progress")
+            .update({ 
+              completed: true,
+              completed_at: timestamp,
+              score: quizResults.percentageCorrect 
+            })
+            .eq("module_name", slug)
+            .eq("user_id", user.id);
+
+          if (updateError) {
+            console.error("Error updating progress:", updateError);
+            throw updateError;
+          }
+          
+          console.log("Update result:", updateData);
+        } else {
+          console.log("Module was already marked as completed, no update needed");
+        }
+
+        // Always verify the update by querying the database again
+        const { data: verifyData, error: verifyError } = await supabase
+          .from("module_progress")
+          .select("completed, completed_at, score")
+          .eq("module_name", slug)
+          .eq("user_id", user.id)
+          .single();
+          
+        if (verifyError) {
+          console.error("Error verifying progress update:", verifyError);
+        } else {
+          console.log("Verification successful, saved module completion:", verifyData);
+          setIsModuleCompleted(verifyData.completed);
+        }
+      } else {
+        console.log("Quiz not completed successfully, not saving progress");
       }
-
-      setIsQuizCompleted(true);
-      setIsQuizOpen(false);
-      setIsModuleCompleted(true);
-      console.log("Progress saved successfully");
     } catch (error) {
-      setIsQuizCompleted(false);
       console.error("Error saving progress:", error);
+    } finally {
+      // Close the modal regardless of completion status
+      setIsQuizOpen(false);
     }
-
-    // Reset quiz state
-    setIsQuizCompleted(true);
   };
 
   const goToPrevious = () => {

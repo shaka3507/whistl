@@ -1503,8 +1503,31 @@ export default function ChannelPage() {
               <Button 
                 variant="outline" 
                 size="sm" 
-                className="flex-shrink-0 px-2 sm:px-3 rounded-full transition-colors hover:bg-green-100 hover:text-green-700 hover:border-green-300 dark:hover:bg-green-800/30 dark:hover:text-green-400"
-                onClick={() => setShowSuppliesView(true)}
+                className={`flex-shrink-0 px-2 sm:px-3 rounded-full transition-colors ${
+                  !showSuppliesView && !showWellnessView 
+                    ? "bg-blue-100 text-blue-700 border-blue-300 dark:bg-blue-800/30 dark:text-blue-400" 
+                    : "hover:bg-blue-100 hover:text-blue-700 hover:border-blue-300 dark:hover:bg-blue-800/30 dark:hover:text-blue-400"
+                }`}
+                onClick={() => {
+                  setShowSuppliesView(false);
+                  setShowWellnessView(false);
+                }}
+              >
+                <MessageSquare className="h-4 w-4 sm:mr-1" />
+                <span className="hidden sm:inline">Chat</span>
+              </Button>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className={`flex-shrink-0 px-2 sm:px-3 rounded-full transition-colors ${
+                  showSuppliesView 
+                    ? "bg-green-100 text-green-700 border-green-300 dark:bg-green-800/30 dark:text-green-400" 
+                    : "hover:bg-green-100 hover:text-green-700 hover:border-green-300 dark:hover:bg-green-800/30 dark:hover:text-green-400"
+                }`}
+                onClick={() => {
+                  setShowSuppliesView(true);
+                  setShowWellnessView(false);
+                }}
               >
                 <Package className="h-4 w-4 sm:mr-1" />
                 <span className="hidden sm:inline">Supplies</span>
@@ -1512,8 +1535,15 @@ export default function ChannelPage() {
               <Button 
                 variant="outline" 
                 size="sm" 
-                className="flex-shrink-0 px-2 sm:px-3 rounded-full transition-colors hover:bg-purple-100 hover:text-purple-700 hover:border-purple-300 dark:hover:bg-purple-800/30 dark:hover:text-purple-400"
-                onClick={() => setShowWellnessView(true)}
+                className={`flex-shrink-0 px-2 sm:px-3 rounded-full transition-colors ${
+                  showWellnessView 
+                    ? "bg-purple-100 text-purple-700 border-purple-300 dark:bg-purple-800/30 dark:text-purple-400" 
+                    : "hover:bg-purple-100 hover:text-purple-700 hover:border-purple-300 dark:hover:bg-purple-800/30 dark:hover:text-purple-400"
+                }`}
+                onClick={() => {
+                  setShowWellnessView(true);
+                  setShowSuppliesView(false);
+                }}
               >
                 <Activity className="h-4 w-4 sm:mr-1" />
                 <span className="hidden sm:inline">Wellness</span>
@@ -1597,12 +1627,6 @@ export default function ChannelPage() {
               </Dialog>
               {alert && (
                 <Dialog>
-                  <DialogTrigger asChild>
-                    <Button variant="outline" size="sm" className="flex-shrink-0 rounded-full transition-colors hover:bg-red-100 hover:text-red-700 hover:border-red-300 dark:hover:bg-red-800/30 dark:hover:text-red-400">
-                      <AlertCircle className="h-4 w-4 mr-1" />
-                      <span className="hidden sm:inline">Info</span>
-                    </Button>
-                  </DialogTrigger>
                   <DialogContent>
                     <DialogHeader>
                       <DialogTitle className="text-red-600">
@@ -1641,19 +1665,7 @@ export default function ChannelPage() {
               {/* Conditional rendering for chat or supplies view */}
               {showWellnessView ? (
                 <div className="flex-1 flex flex-col h-full">
-                  <div className="border-b py-2 px-4 flex items-center justify-between">
-                    <div className="flex items-center">
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        className="rounded-full hover:bg-amber-100 hover:text-amber-700 dark:hover:bg-amber-800/30 dark:hover:text-amber-400 mr-2 transition-colors"
-                        onClick={() => setShowWellnessView(false)}
-                      >
-                        <ArrowLeft className="h-5 w-5" />
-                      </Button>
-                      <h2 className="font-semibold">Wellness Check</h2>
-                    </div>
-                    
+                  <div className="border-b py-2 px-4 flex justify-end">
                     {isAdmin && (
                       <Button 
                         variant="outline" 
@@ -1885,20 +1897,6 @@ export default function ChannelPage() {
                 </div>
               ) : showSuppliesView ? (
                 <div className="flex-1 flex flex-col h-full">
-                  <div className="border-b py-2 px-4 flex items-center justify-between">
-                    <div className="flex items-center">
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        className="rounded-full hover:bg-amber-100 hover:text-amber-700 dark:hover:bg-amber-800/30 dark:hover:text-amber-400 mr-2 transition-colors"
-                        onClick={() => setShowSuppliesView(false)}
-                      >
-                        <ArrowLeft className="h-5 w-5" />
-                      </Button>
-                      <h2 className="font-semibold">Group Supplies</h2>
-                    </div>
-                  </div>
-                  
                   <div className="overflow-y-auto flex-1 p-4">
                     {/* Always show "I need something not listed" button at the top */}
                     <div className="flex justify-end mb-6">
@@ -2251,13 +2249,65 @@ export default function ChannelPage() {
               )}
             </div>
             <div className="border-t p-4">
-              {isAdmin ? (
-                <Tabs defaultValue="message" className="mb-4">
-                  <TabsList>
-                    <TabsTrigger value="message">Message</TabsTrigger>
-                    <TabsTrigger value="notification">Notification</TabsTrigger>
-                  </TabsList>
-                  <TabsContent value="message">
+              {/* Only show the message input when in chat view (not supplies or wellness) */}
+              {!showSuppliesView && !showWellnessView && (
+                <>
+                  {isAdmin ? (
+                    <Tabs defaultValue="message" className="mb-4">
+                      <TabsList>
+                        <TabsTrigger value="message">Message</TabsTrigger>
+                        <TabsTrigger value="notification">Notification</TabsTrigger>
+                      </TabsList>
+                      <TabsContent value="message">
+                        <form onSubmit={handleSendMessage} className="flex gap-2">
+                          <Input
+                            placeholder="Type your message..."
+                            value={newMessage}
+                            onChange={(e) => setNewMessage(e.target.value)}
+                            disabled={isSending}
+                          />
+                          <Button type="submit" disabled={isSending || !newMessage.trim()}>
+                            <Send className="h-4 w-4" />
+                          </Button>
+                        </form>
+                      </TabsContent>
+                      <TabsContent value="notification">
+                        <form
+                          onSubmit={handleSendNotification}
+                          className="flex flex-col gap-2"
+                        >
+                          <div className="flex items-center gap-4 mb-2">
+                            <div className="text-sm font-medium">Push Notification:</div>
+                            <Switch
+                              id="notification-type-switch"
+                              checked={notificationType === 'push'}
+                              onCheckedChange={(checked) => 
+                                setNotificationType(checked ? 'push' : 'standard')
+                              }
+                            />
+                            <span className="text-sm text-muted-foreground">
+                              {notificationType === 'push' ? 'Push' : 'Standard'}
+                            </span>
+                          </div>
+                          <Textarea
+                            placeholder="Type an important notification..."
+                            value={notificationText}
+                            onChange={(e) => setNotificationText(e.target.value)}
+                            disabled={isSending}
+                            className="min-h-[80px]"
+                          />
+                          <Button
+                            type="submit"
+                            disabled={isSending || !notificationText.trim()}
+                            className="h-10 w-fit ml-auto"
+                          >
+                            Send {notificationType === 'push' ? 'Push' : 'Standard'} Notification
+                            <Bell className="h-4 w-4" />
+                          </Button>
+                        </form>
+                      </TabsContent>
+                    </Tabs>
+                  ) : isUserChannelMember ? (
                     <form onSubmit={handleSendMessage} className="flex gap-2">
                       <Input
                         placeholder="Type your message..."
@@ -2265,66 +2315,19 @@ export default function ChannelPage() {
                         onChange={(e) => setNewMessage(e.target.value)}
                         disabled={isSending}
                       />
-                      <Button type="submit" disabled={isSending || !newMessage.trim()}>
+                      <Button
+                        type="submit"
+                        disabled={isSending || !newMessage.trim()}
+                      >
                         <Send className="h-4 w-4" />
                       </Button>
                     </form>
-                  </TabsContent>
-                  <TabsContent value="notification">
-                    <form
-                      onSubmit={handleSendNotification}
-                      className="flex flex-col gap-2"
-                    >
-                      <div className="flex items-center gap-4 mb-2">
-                        <div className="text-sm font-medium">Push Notification:</div>
-                        <Switch
-                          id="notification-type-switch"
-                          checked={notificationType === 'push'}
-                          onCheckedChange={(checked) => 
-                            setNotificationType(checked ? 'push' : 'standard')
-                          }
-                        />
-                        <span className="text-sm text-muted-foreground">
-                          {notificationType === 'push' ? 'Push' : 'Standard'}
-                        </span>
-                      </div>
-                      <Textarea
-                        placeholder="Type an important notification..."
-                        value={notificationText}
-                        onChange={(e) => setNotificationText(e.target.value)}
-                        disabled={isSending}
-                        className="min-h-[80px]"
-                      />
-                      <Button
-                        type="submit"
-                        disabled={isSending || !notificationText.trim()}
-                        className="h-10 w-fit ml-auto"
-                      >
-                        Send {notificationType === 'push' ? 'Push' : 'Standard'} Notification
-                        <Bell className="h-4 w-4" />
-                      </Button>
-                    </form>
-                  </TabsContent>
-                </Tabs>
-              ) : isUserChannelMember ? (
-                <form onSubmit={handleSendMessage} className="flex gap-2">
-                  <Input
-                    placeholder="Type your message..."
-                    value={newMessage}
-                    onChange={(e) => setNewMessage(e.target.value)}
-                    disabled={isSending}
-                  />
-                  <Button
-                    type="submit"
-                    disabled={isSending || !newMessage.trim()}
-                  >
-                    <Send className="h-4 w-4" />
-                  </Button>
-                </form>
-              ) : (
-                <div className="text-center text-muted-foreground py-2 text-sm">
-                  You are not a member of this channel and cannot send messages.
-                </div>
+                  ) : (
+                    <div className="text-center text-muted-foreground py-2 text-sm">
+                      You are not a member of this channel and cannot send messages.
+                    </div>
+                  )}
+                </>
               )}
             </div>
           </div>
