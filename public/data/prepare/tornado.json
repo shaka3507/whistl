@@ -1,6 +1,49 @@
 {
   "title": "Tornado Safety: Your Quick-Action Guide",
   "description": "Learn how to stay safe before, during, and after a tornado strikes.",
+  "is_module": true,
+  "questions": [
+    {
+      "question": "What is the safest place to seek shelter during a tornado if you are in a house with a basement?",
+      "options": ["Under a sturdy table in the basement", "In a first-floor hallway", "In a closet on the ground floor", "Near a window to watch the storm"],
+      "answer": "Under a sturdy table in the basement"
+    },
+    {
+      "question": "Which of these is NOT a sign of an approaching tornado?",
+      "options": ["A loud roar similar to a freight train", "Dark, often greenish sky", "Large hail", "Steady, light rainfall"],
+      "answer": "Steady, light rainfall"
+    },
+    {
+      "question": "What should you do if you're caught in a vehicle during a tornado?",
+      "options": ["Drive away from the tornado at right angles if possible", "Park under a highway overpass for protection", "Get out and run to the nearest ditch", "Continue driving as fast as possible"],
+      "answer": "Drive away from the tornado at right angles if possible"
+    },
+    {
+      "question": "What is the recommended action if you're in a mobile home during a tornado warning?",
+      "options": ["Get out immediately and go to a sturdy shelter", "Go to an interior room without windows", "Get in the bathtub and cover yourself", "Open windows to equalize pressure"],
+      "answer": "Get out immediately and go to a sturdy shelter"
+    },
+    {
+      "question": "What is the greatest danger during tornadoes?",
+      "options": ["Flying debris", "Lightning strikes", "Flooding", "High winds alone"],
+      "answer": "Flying debris"
+    },
+    {
+      "question": "In a house without a basement, where should you take shelter during a tornado?",
+      "options": ["A small interior room on the lowest floor", "Any room with reinforced walls", "The garage", "Under a staircase on any floor"],
+      "answer": "A small interior room on the lowest floor"
+    },
+    {
+      "question": "What should you NOT do after a tornado?",
+      "options": ["Enter damaged buildings", "Check on neighbors", "Use battery-powered flashlights", "Stay tuned to weather updates"],
+      "answer": "Enter damaged buildings"
+    },
+    {
+      "question": "Which myth about tornado safety should be ignored?",
+      "options": ["Opening windows to equalize pressure", "Seeking shelter in a basement", "Protecting your head from debris", "Moving at right angles to a tornado's path"],
+      "answer": "Opening windows to equalize pressure"
+    }
+  ],
   "sections": [
     {
       "title": "Before a Tornado",
@@ -27,6 +70,10 @@
     {
       "title": "Red Cross Tornado Safety",
       "url": "https://www.redcross.org/get-help/how-to-prepare-for-emergencies/types-of-emergencies/tornado.html"
+    },
+    {
+      "title": "NOAA Storm Prediction Center Tornado FAQ",
+      "url": "https://www.spc.noaa.gov/faq/tornado/safety.html"
     }
   ]
 } 

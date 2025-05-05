@@ -754,22 +754,38 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!user) return { error: new Error("No user logged in") };
 
     try {
+      console.log("Starting profile update for user:", user.id);
+      console.log("Update payload:", updates);
+      
       // Create update with retry
       const updateProfileFn = async () => {
-        return await supabase
+        const response = await supabase
           .from("profiles")
           .update({ ...updates, updated_at: new Date().toISOString() })
           .eq("id", user.id);
+          
+        if (response.error) {
+          console.error("Supabase update error:", {
+            status: response.error.code,
+            message: response.error.message,
+            details: response.error.details,
+            hint: response.error.hint
+          });
+        }
+        
+        return response;
       };
 
       const { error } = await fetchWithRetry(updateProfileFn);
 
       if (error) {
+        console.error("Update profile error:", error);
         return { error };
       }
 
       // Refresh profile data
       await fetchProfile(user.id);
+      console.log("Profile updated successfully");
 
       return { error: null };
     } catch (err) {

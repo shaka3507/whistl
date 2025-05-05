@@ -115,10 +115,10 @@ export async function POST(request: Request) {
       
       // Check if user is already a member
       const { data: existingMember, error: memberCheckError } = await dbClient
-        .from('channel_members')
-        .select('id')
-        .eq('channel_id', channelId)
-        .eq('user_id', existingUser.id)
+        .from("channel_members")
+        .select("id")
+        .eq("channel_id", channelId)
+        .eq("user_id", existingUser.id)
         .maybeSingle();
         
       if (memberCheckError && memberCheckError.code !== 'PGRST116') {
@@ -127,18 +127,18 @@ export async function POST(request: Request) {
       
       if (existingMember) {
         return NextResponse.json(
-          { message: 'User is already a member of this channel' },
+          { message: `${normalizedEmail} is already a member of this channel` },
           { status: 200 }
         );
       }
       
       // Add user to channel
       const { error: addError } = await dbClient
-        .from('channel_members')
+        .from("channel_members")
         .insert({
           channel_id: channelId,
           user_id: existingUser.id,
-          role: 'member'
+          role: "member"
         });
         
       if (addError) {
@@ -147,11 +147,11 @@ export async function POST(request: Request) {
       
       // Send notification in the channel
       await dbClient
-        .from('messages')
+        .from("messages")
         .insert({
           channel_id: channelId,
           user_id: requestUserId,
-          content: `${existingUser.full_name || normalizedEmail} has been invited to the channel`,
+          content: `${existingUser.full_name || normalizedEmail} has been added to the channel`,
           is_notification: true
         });
         
@@ -170,7 +170,11 @@ export async function POST(request: Request) {
       }
         
       return NextResponse.json(
-        { message: 'User has been added to the channel' },
+        { 
+          message: `${existingUser.full_name || normalizedEmail} has been added to the channel`,
+          userAdded: true,
+          addedUserId: existingUser.id
+        },
         { status: 200 }
       );
     } else {

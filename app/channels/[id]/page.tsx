@@ -55,6 +55,7 @@ import {
   Pencil,
   Plus
 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 type Channel = Database["public"]["Tables"]["channels"]["Row"];
 type Alert = Database["public"]["Tables"]["alerts"]["Row"] & {
@@ -173,6 +174,7 @@ export default function ChannelPage() {
   const [showCreatePollForm, setShowCreatePollForm] = useState<boolean>(false);
   const [minPollValue, setMinPollValue] = useState<number>(1);
   const [maxPollValue, setMaxPollValue] = useState<number>(5);
+  const { toast } = useToast();
 
   // Check if running on localhost
   useEffect(() => {
@@ -561,20 +563,18 @@ export default function ChannelPage() {
 
       console.log("Invitation result:", result);
 
-      // Success - show message and clear the input
-      // Set message with a success type (will display in green)
-      setError(result.message);
+      // Clear the input field
       setInviteEmail("");
       
-      // If we have an invitation URL in development mode, show it
-      if (result.invitationUrl) {
-        console.log("Invitation URL:", result.invitationUrl);
-        // For development purposes, add the URL to the success message
-        setError(prev => `${prev || ''} Development URL: ${result.invitationUrl}`);
-      }
-      
-      // Refresh members list after successful invite
-      if (result.message.includes('added to the channel')) {
+      // Different toast message based on whether user was added or invited
+      if (result.userAdded) {
+        toast({
+          title: "User Added",
+          description: result.message,
+          variant: "default",
+        });
+        
+        // Refresh members list since a user was added
         const { data: membersData } = await supabase
           .from("channel_members")
           .select(
@@ -588,13 +588,34 @@ export default function ChannelPage() {
         if (membersData) {
           setMembers(membersData);
         }
+      } else {
+        toast({
+          title: "Invitation Sent",
+          description: result.message,
+          variant: "default",
+        });
       }
       
-      // Clear success message after a few seconds
-      setTimeout(() => setError(null), 10000); // Show message longer for development
+      // If we have an invitation URL in development mode, show it
+      if (result.invitationUrl) {
+        console.log("Invitation URL:", result.invitationUrl);
+        // For development purposes, add the URL to a secondary toast
+        if (process.env.NODE_ENV === 'development') {
+          toast({
+            title: "Development Info",
+            description: `Invitation URL: ${result.invitationUrl}`,
+            variant: "default",
+          });
+        }
+      }
     } catch (err: any) {
       console.error("Error inviting user:", err);
-      setError(err.message || "Failed to add user to the channel");
+      // Show error message as a toast
+      toast({
+        title: "Invitation Failed",
+        description: err.message || "Failed to add user to the channel",
+        variant: "destructive",
+      });
     } finally {
       setIsSending(false);
     }
@@ -773,11 +794,30 @@ export default function ChannelPage() {
           ...prev,
           [itemId]: claimedQuantity
         }));
+        
+        // Show success toast notification
+        toast({
+          title: "Item Claimed",
+          description: `You've successfully claimed ${item.name}`,
+          variant: "default",
+        });
       } else {
         console.error("Failed to claim item:", data.error);
+        // Show error toast notification
+        toast({
+          title: "Claim Failed",
+          description: data.error || "Failed to claim item",
+          variant: "destructive",
+        });
       }
     } catch (error) {
       console.error("Error claiming item:", error);
+      // Show error toast notification for exception
+      toast({
+        title: "Error",
+        description: "Something went wrong when claiming the item",
+        variant: "destructive",
+      });
     }
   };
 
@@ -1555,8 +1595,8 @@ export default function ChannelPage() {
                         <Button type="submit">Invite</Button>
                       </div>
                     </form>
-                    <span className="text-muted-foreground text-sm text-center block">- or -</span>
-                    <Button variant="outline" onClick={() => console.log("upload members")}>upload members</Button>
+                    
+                    
                     </>
                   )}
                 </DialogContent>

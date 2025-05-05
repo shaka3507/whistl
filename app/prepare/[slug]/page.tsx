@@ -304,23 +304,24 @@ export default function PreparePage() {
   // Calculate text color styles based on scroll progress
   const getTextColorStyle = (baseProgress = 0) => {
     // Adjust progress to create a staggered effect for different sections
+    // Reverse the effect: 1 - scrollProgress to make text start white and gray out as scrolling down
     const adjustedProgress = Math.max(
       0,
-      Math.min(1, scrollProgress * 1.5 - baseProgress)
+      Math.min(1, 1 - (scrollProgress * 1.5 - baseProgress))
     );
 
-    // Interpolate between light grey and pure white text
-    const startColor = [220, 220, 220]; // RGB for light grey text
-    const endColor = [255, 255, 255]; // RGB for white text
+    // Interpolate between pure white and light grey text (reversed from original)
+    const startColor = [255, 255, 255]; // RGB for pure white text (at top)
+    const endColor = [180, 180, 180]; // RGB for light grey text (further down)
 
     const r = Math.round(
-      startColor[0] + (endColor[0] - startColor[0]) * adjustedProgress
+      startColor[0] + (endColor[0] - startColor[0]) * (1 - adjustedProgress)
     );
     const g = Math.round(
-      startColor[1] + (endColor[1] - startColor[1]) * adjustedProgress
+      startColor[1] + (endColor[1] - startColor[1]) * (1 - adjustedProgress)
     );
     const b = Math.round(
-      startColor[2] + (endColor[2] - startColor[2]) * adjustedProgress
+      startColor[2] + (endColor[2] - startColor[2]) * (1 - adjustedProgress)
     );
 
     return {
@@ -528,13 +529,23 @@ export default function PreparePage() {
                     <CheckCircle className="inline-block w-6 h-6" /> Quiz
                     Completed
                   </p>
-    
               )}
 
               {isModuleCompleted === false && (
-                <p className="text-2xl text-yellow-500 mb-4">
-                  Continue Reviewing
-                </p>
+                <div className="mb-6">
+                  <p className="text-2xl text-yellow-500 mb-2">
+                    Continue Reviewing
+                  </p>
+                  
+                  {data.is_module && data.questions && (
+                    <Button
+                      onClick={() => setIsQuizOpen(true)}
+                      className="bg-blue-200 text-lg text-primary-foreground hover:bg-blue-900/90 hover:text-white mt-2"
+                    >
+                      {isModuleCompleted ? "Retake Quiz" : "Take Quiz"}
+                    </Button>
+                  )}
+                </div>
               )}
 
               <p
@@ -837,7 +848,7 @@ export default function PreparePage() {
                               <div
                                 key={index}
                                 className={`w-6 h-2 rounded-full ${
-                                  index < currentQuestion
+                                  index <= currentQuestion
                                     ? "bg-white"
                                     : "bg-white/30"
                                 }`}
@@ -877,7 +888,7 @@ export default function PreparePage() {
                                 <button
                                   key={i}
                                   onClick={() => handleOptionSelect(option)}
-                                  className={`flex items-center justify-center px-4 py-3 rounded-full font-semibold transition-all ${
+                                  className={`flex items-center justify-center px-4 py-3 font-semibold transition-all ${
                                     isSelected
                                       ? isIncorrect
                                         ? "bg-red-500 text-white"
@@ -894,19 +905,19 @@ export default function PreparePage() {
                         </div>
 
                         {/* Navigation Buttons */}
-                        <div className="flex justify-between items-center">
+                        <div className="flex justify-between items-center h-16">
                           <button
                             onClick={goToPrevious}
-                            className="bg-white/20 text-white rounded-full px-5 py-2"
+                            className="bg-white/20 text-white px-5 py-2 min-w-16 h-12 flex items-center justify-center"
                             disabled={currentQuestion === 0}
                           >
-                            <ArrowLeftCircle className="w-4 h-4 mr-2 h-9 w-9 text-5xl" />
+                            <ArrowLeftCircle className="h-8 w-8" />
                           </button>
                           <button
                             onClick={goToNext}
-                            className="bg-white text-green-800 rounded-full px-5 py-2 font-semibold"
+                            className="bg-white text-green-800 px-5 py-2 font-semibold min-w-16 h-12 flex items-center justify-center"
                           >
-                            <ArrowRightCircle className="w-4 h-4 mr-2 h-9 w-9 text-5xl" />
+                            <ArrowRightCircle className="h-8 w-8" />
                           </button>
                         </div>
                       </div>

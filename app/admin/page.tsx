@@ -52,8 +52,6 @@ type RequestedItemsByChannel = {
 
 export default function AdminPage() {
   const { user, isAdmin } = useAuth()
-  
-  console.log('Admin access check:', { userId: user?.id, isAdmin })
   const router = useRouter()
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)

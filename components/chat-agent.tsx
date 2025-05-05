@@ -110,7 +110,7 @@ function ChatAgentComponent() {
                 message.role === "user"
                   ? "bg-primary text-primary-foreground"
                   : "bg-muted"
-              }`}
+              } ${message.role === "assistant" ? "relative group" : ""}`}
             >
               {message.role === "assistant" ? (
                 <div className="space-y-2">
