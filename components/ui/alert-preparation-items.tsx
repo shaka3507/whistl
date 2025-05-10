@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
-import { Plus, Minus, AlertTriangle } from "lucide-react";
+import { Plus, Minus, AlertTriangle, ChevronDown, ChevronUp } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 
 type Category = {
@@ -38,6 +38,12 @@ interface AlertPreparationItemsProps {
   onItemsSelected: (items: any[]) => void;
 }
 
+// List of initial categories to show
+const initialCategories = [
+  'tornado', 'blizzard', 'urban fire', 'heatwave', 
+  'cold wave', 'earthquake', 'wildfire', 'flood'
+];
+
 export function AlertPreparationItems({ onItemsSelected }: AlertPreparationItemsProps) {
   const [categories, setCategories] = useState<Category[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<number | null>(null);
@@ -45,6 +51,7 @@ export function AlertPreparationItems({ onItemsSelected }: AlertPreparationItems
   const [selectedItems, setSelectedItems] = useState<{ [key: number]: SelectedItem }>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showAllCategories, setShowAllCategories] = useState(false);
 
   // Fetch categories
   useEffect(() => {
@@ -145,6 +152,18 @@ export function AlertPreparationItems({ onItemsSelected }: AlertPreparationItems
     });
   };
 
+  // Filter categories based on showAllCategories state
+  const displayedCategories = showAllCategories 
+    ? categories 
+    : categories.filter(category => 
+        initialCategories.some(name => 
+          category.name.toLowerCase().includes(name.toLowerCase())));
+
+  // Check if there are additional categories beyond the initial set
+  const hasAdditionalCategories = categories.length > categories.filter(category => 
+    initialCategories.some(name => 
+      category.name.toLowerCase().includes(name.toLowerCase()))).length;
+
   if (loading && categories.length === 0) {
     return (
       <div className="space-y-4">
@@ -164,7 +183,7 @@ export function AlertPreparationItems({ onItemsSelected }: AlertPreparationItems
       <div>
         <h3 className="text-base font-medium mb-4">Select Emergency Category</h3>
         <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-          {categories.map(category => (
+          {displayedCategories.map(category => (
             <Button
               key={category.id}
               variant={selectedCategory === category.id ? "default" : "outline"}
@@ -176,6 +195,22 @@ export function AlertPreparationItems({ onItemsSelected }: AlertPreparationItems
             </Button>
           ))}
         </div>
+        
+        {/* Always show the toggle button if categories are loaded and there are additional categories */}
+        {!loading && hasAdditionalCategories && (
+          <Button
+            variant="ghost"
+            onClick={() => setShowAllCategories(!showAllCategories)}
+            className="mt-3 w-full justify-center"
+            type="button"
+          >
+            {showAllCategories ? "Show fewer categories" : "Show more categories"} 
+            {showAllCategories ? 
+              <ChevronUp className="ml-2 h-4 w-4" /> : 
+              <ChevronDown className="ml-2 h-4 w-4" />
+            }
+          </Button>
+        )}
       </div>
 
       {selectedCategory && (
