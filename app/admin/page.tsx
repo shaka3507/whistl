@@ -12,12 +12,20 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { supabase } from "@/lib/supabase"
-import { AlertTriangle, MessageSquare, Plus, Phone, Smartphone } from "lucide-react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { AlertTriangle, MessageSquare, Plus, Phone, Smartphone, Trash2 } from "lucide-react"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { AlertPreparationItems } from "@/components/ui/alert-preparation-items"
 import Link from "next/link"
 import type { Database } from "@/lib/supabase-types"
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogHeader, 
+  DialogTitle, 
+  DialogDescription,
+  DialogFooter 
+} from "@/components/ui/dialog"
 
 type Channel = Database["public"]["Tables"]["channels"]["Row"] & {
   alerts: Database["public"]["Tables"]["alerts"]["Row"][] | null
@@ -75,6 +83,10 @@ export default function AdminPage() {
   const [requestedItemsByChannel, setRequestedItemsByChannel] = useState<RequestedItemsByChannel[]>([])
   const [isLoadingRequestedItems, setIsLoadingRequestedItems] = useState(true)
   const [requestedItemsError, setRequestedItemsError] = useState<string | null>(null)
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [channelToDelete, setChannelToDelete] = useState<Channel | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
 
   const handleCreateAlert = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -388,12 +400,53 @@ export default function AdminPage() {
     }
   }
 
+  const handleDeleteChannel = async (channel: Channel) => {
+    // Open confirmation dialog
+    setChannelToDelete(channel)
+    setDeleteDialogOpen(true)
+    setDeleteError(null)
+  }
+
+  const confirmDeleteChannel = async () => {
+    if (!channelToDelete || !user || !isAdmin) return;
+    
+    setIsDeleting(true)
+    setDeleteError(null)
+    
+    try {
+      // Delete the channel - this will cascade delete related alerts and members
+      const { error } = await supabase
+        .from("channels")
+        .delete()
+        .eq("id", channelToDelete.id);
+        
+      if (error) {
+        throw error;
+      }
+      
+      // Update the local state to remove the deleted channel
+      setChannels(prevChannels => 
+        prevChannels.filter(c => c.id !== channelToDelete.id)
+      );
+      
+      // Close the dialog
+      setDeleteDialogOpen(false);
+      setChannelToDelete(null);
+      
+    } catch (err: any) {
+      console.error("Error deleting channel:", err);
+      setDeleteError(err.message || "Failed to delete channel");
+    } finally {
+      setIsDeleting(false);
+    }
+  }
+
   return (
     <div className="flex min-h-screen flex-col">
       <Header />
       <main className="flex-1 container py-6">
         <div className="flex items-center justify-between mb-6">
-          <h1 className="text-3xl font-bold">Admin Dashboard</h1>
+          <h1 className="text-3xl font-bold">Admin Alert Dashboard</h1>
         </div>
 
         <Tabs defaultValue="create-alert" className="w-full">
@@ -643,7 +696,17 @@ export default function AdminPage() {
                   {channels.map((channel) => (
                     <Card key={channel.id}>
                       <CardHeader>
-                        <CardTitle>{channel.name}</CardTitle>
+                        <CardTitle className="flex justify-between items-center">
+                          <span>{channel.name}</span>
+                          <Button 
+                            variant="destructive" 
+                            size="sm" 
+                            onClick={() => handleDeleteChannel(channel)}
+                            className="ml-auto"
+                          >
+                            Deactivate Alert
+                          </Button>
+                        </CardTitle>
                         <CardDescription>{channel.description}</CardDescription>
                       </CardHeader>
                       <CardContent>
@@ -811,6 +874,50 @@ export default function AdminPage() {
           </TabsContent>
         </Tabs>
       </main>
+
+      {/* Delete confirmation dialog */}
+      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Deactivate Alert</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to deactivate the alert for "{channelToDelete?.name}"?
+              This will permanently remove the channel, all alerts, messages, and member associations.
+              This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          
+          {deleteError && (
+            <div className="rounded-md bg-red-50 p-4 mt-4">
+              <div className="flex">
+                <div className="flex-shrink-0">
+                  <AlertTriangle className="h-5 w-5 text-red-400" />
+                </div>
+                <div className="ml-3">
+                  <h3 className="text-sm font-medium text-red-800">{deleteError}</h3>
+                </div>
+              </div>
+            </div>
+          )}
+          
+          <DialogFooter className="mt-4">
+            <Button 
+              variant="outline" 
+              onClick={() => setDeleteDialogOpen(false)}
+              disabled={isDeleting}
+            >
+              Cancel
+            </Button>
+            <Button 
+              variant="destructive" 
+              onClick={confirmDeleteChannel}
+              disabled={isDeleting}
+            >
+              {isDeleting ? "Deactivating..." : "Deactivate Alert"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
