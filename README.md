@@ -7,8 +7,9 @@ Emergency preparation application developed for CS 484/584 - Full Stack Web Deve
 To run this application locally:
 
 1. **Prerequisites**
-   - Node.js 18+ installed on your machine
+   - Node.js 20.12.2 or later installed on your machine (as specified in `.nvmrc`)
    - npm or yarn package manager
+   - nvm (Node Version Manager) installed
 
 2. **Setup**
    - Clone this repository
@@ -19,26 +20,40 @@ To run this application locally:
        - API keys for additional services
      - **Important**: No additional setup is required as you'll be connecting to my existing services
 
-3. **Install dependencies**
+3. **Quick Start**
    ```bash
+   # Use the correct Node.js version, install dependencies, and start the dev server in one command
+   nvm use && npm i && npm run dev
+   ```
+
+   Or if you prefer the step-by-step approach:
+
+   ```bash
+   # Set the correct Node.js version
+   nvm use
+   
+   # Install dependencies
    npm install
    # or
    yarn install
-   ```
-
-4. **Start the development server**
-   ```bash
+   
+   # Start the development server
    npm run dev
    # or
    yarn dev
    ```
 
-5. **Access the application**
+4. **Access the application**
    - Open your browser and navigate to [http://localhost:3000](http://localhost:3000)
    - You can either:
      - Create a new account by visiting the signup page
      - When creating an account, check the "Admin Access" checkbox to gain administrative privileges
      - The application has role-based permissions that restrict certain features to admin users only
+
+5. **Styleguide**
+   - A comprehensive styleguide is available at [http://localhost:3000/styleguide](http://localhost:3000/styleguide)
+   - The styleguide showcases all UI components and design patterns used throughout the application
+   - Use this as a reference when developing new features to maintain design consistency
 
 
 ### Application Structure
