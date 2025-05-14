@@ -7,5 +7,22 @@ import {
 } from 'next-themes'
 
 export function ThemeProvider({ children, ...props }: ThemeProviderProps) {
-  return <NextThemesProvider {...props}>{children}</NextThemesProvider>
+  // Using forcedTheme during initial render to avoid hydration mismatch
+  const [mounted, setMounted] = React.useState(false)
+
+  // After mounting, we have access to the client
+  React.useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  return (
+    <NextThemesProvider 
+      {...props}
+      enableSystem={mounted ? props.enableSystem : false}
+      enableColorScheme={mounted ? props.enableColorScheme : false}
+      storageKey="whistl-theme"
+    >
+      {children}
+    </NextThemesProvider>
+  )
 }

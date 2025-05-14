@@ -12,7 +12,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { supabase } from "@/lib/supabase"
-import { AlertTriangle, MessageSquare, Plus, Phone, Smartphone, Trash2 } from "lucide-react"
+import { AlertTriangle, MessageSquare, Plus, Phone, Smartphone, Trash2, PlusCircle, Edit, Save, X } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { AlertPreparationItems } from "@/components/ui/alert-preparation-items"
@@ -58,6 +58,27 @@ type RequestedItemsByChannel = {
   items: RequestedItem[]
 }
 
+// Define types for emergency categories and template items
+type Category = {
+  id: number
+  name: string
+  description: string
+  icon?: string
+  created_at: string
+  updated_at: string
+}
+
+type TemplateItem = {
+  id: number
+  category_id: number
+  name: string
+  description: string | null
+  recommended_quantity: number
+  unit: string
+  created_at: string
+  updated_at: string
+}
+
 export default function AdminPage() {
   const { user, isAdmin } = useAuth()
   const router = useRouter()
@@ -87,6 +108,25 @@ export default function AdminPage() {
   const [channelToDelete, setChannelToDelete] = useState<Channel | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
+  
+  // Add state for categories and template items
+  const [categories, setCategories] = useState<Category[]>([])
+  const [selectedCategory, setSelectedCategory] = useState<Category | null>(null)
+  const [templateItems, setTemplateItems] = useState<TemplateItem[]>([])
+  const [isLoadingCategories, setIsLoadingCategories] = useState(true)
+  const [categoriesError, setCategoriesError] = useState<string | null>(null)
+  const [newCategory, setNewCategory] = useState({ name: "", description: "", icon: "" })
+  const [newItem, setNewItem] = useState({ 
+    name: "", 
+    description: "", 
+    recommended_quantity: 1, 
+    unit: "item" 
+  })
+  const [isAddingCategory, setIsAddingCategory] = useState(false)
+  const [isAddingItem, setIsAddingItem] = useState(false)
+  const [isSavingCategory, setIsSavingCategory] = useState(false)
+  const [isSavingItem, setIsSavingItem] = useState(false)
+  const [editingCategory, setEditingCategory] = useState<Category | null>(null)
 
   const handleCreateAlert = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -176,14 +216,44 @@ export default function AdminPage() {
       if (!user) return
 
       try {
-        // Get all channels with their alerts
-        const { data, error } = await supabase
+        // For admins, only show channels they created
+        // For regular users, show channels they are members of
+        let query = supabase
           .from("channels")
           .select(`
             *,
             alerts(*)
           `)
-          .order("created_at", { ascending: false })
+        
+        // If admin, filter by channels they created
+        if (isAdmin) {
+          query = query.eq('created_by', user.id)
+        } else {
+          // For regular users, filter by membership
+          // First get the channel IDs they're members of
+          const { data: memberChannels, error: memberError } = await supabase
+            .from("channel_members")
+            .select("channel_id")
+            .eq("user_id", user.id)
+          
+          if (memberError) {
+            throw memberError
+          }
+          
+          // Extract channel IDs and filter by them
+          if (memberChannels && memberChannels.length > 0) {
+            const channelIds = memberChannels.map(m => m.channel_id)
+            query = query.in('id', channelIds)
+          } else {
+            // If user is not a member of any channels, return empty array
+            setChannels([])
+            setIsLoading(false)
+            return
+          }
+        }
+        
+        // Execute the query with appropriate filters
+        const { data, error } = await query.order("created_at", { ascending: false })
 
         if (error) {
           throw error
@@ -199,7 +269,7 @@ export default function AdminPage() {
     }
 
     fetchChannels()
-  }, [user])
+  }, [user, isAdmin])
 
   useEffect(() => {
     const fetchUsers = async () => {
@@ -248,26 +318,64 @@ export default function AdminPage() {
   // Add new useEffect to fetch requested items
   useEffect(() => {
     const fetchRequestedItems = async () => {
-      if (!user || !isAdmin) return
+      if (!user) return
 
       setIsLoadingRequestedItems(true)
       setRequestedItemsError(null)
 
       try {
-        // First fetch all channels
+        // Get channel IDs based on user role
+        let accessibleChannelIds: string[] = []
+        
+        if (isAdmin) {
+          // For admins, get channels they created
+          const { data: adminChannels, error: adminChannelsError } = await supabase
+            .from("channels")
+            .select("id")
+            .eq("created_by", user.id)
+            
+          if (adminChannelsError) {
+            throw adminChannelsError
+          }
+          
+          accessibleChannelIds = adminChannels?.map(c => c.id) || []
+        } else {
+          // For regular users, get channels they are members of
+          const { data: memberChannels, error: memberError } = await supabase
+            .from("channel_members")
+            .select("channel_id")
+            .eq("user_id", user.id)
+            
+          if (memberError) {
+            throw memberError
+          }
+          
+          accessibleChannelIds = memberChannels?.map(m => m.channel_id) || []
+        }
+        
+        // If no accessible channels, return empty result
+        if (accessibleChannelIds.length === 0) {
+          setRequestedItemsByChannel([])
+          setIsLoadingRequestedItems(false)
+          return
+        }
+
+        // Fetch only the channels the user has access to
         const { data: channelsData, error: channelsError } = await supabase
           .from("channels")
           .select("*")
+          .in("id", accessibleChannelIds)
           .order("name", { ascending: true })
 
         if (channelsError) {
           throw channelsError
         }
 
-        // Then fetch all requested items - without trying to join profiles
+        // Fetch requested items only for accessible channels
         const { data: requestedItemsData, error: requestedItemsError } = await supabase
           .from("requested_items")
           .select("*")
+          .in("channel_id", accessibleChannelIds)
           .order("created_at", { ascending: false })
 
         if (requestedItemsError) {
@@ -414,11 +522,12 @@ export default function AdminPage() {
     setDeleteError(null)
     
     try {
-      // Delete the channel - this will cascade delete related alerts and members
+      // Delete the channel - but only if the user created it
       const { error } = await supabase
         .from("channels")
         .delete()
-        .eq("id", channelToDelete.id);
+        .eq("id", channelToDelete.id)
+        .eq("created_by", user.id); // Add this condition to ensure admins can only delete their own channels
         
       if (error) {
         throw error;
@@ -435,9 +544,254 @@ export default function AdminPage() {
       
     } catch (err: any) {
       console.error("Error deleting channel:", err);
-      setDeleteError(err.message || "Failed to delete channel");
+      setDeleteError(err.message || "Failed to delete channel. You can only delete channels you've created.");
     } finally {
       setIsDeleting(false);
+    }
+  }
+
+  // Add useEffect to fetch categories
+  useEffect(() => {
+    const fetchCategories = async () => {
+      if (!user || !isAdmin) return
+      
+      setIsLoadingCategories(true)
+      setCategoriesError(null)
+      
+      try {
+        const { data, error } = await supabase
+          .from("prepare_categories")
+          .select("*")
+          .order("name")
+          
+        if (error) throw error
+        
+        setCategories(data || [])
+        
+        // If we have categories and none is selected, select the first one
+        if (data && data.length > 0 && !selectedCategory) {
+          setSelectedCategory(data[0])
+        }
+      } catch (err: any) {
+        console.error("Error fetching categories:", err)
+        setCategoriesError(err.message || "Failed to load emergency categories")
+      } finally {
+        setIsLoadingCategories(false)
+      }
+    }
+    
+    fetchCategories()
+  }, [user, isAdmin, selectedCategory])
+  
+  // Add useEffect to fetch template items for selected category
+  useEffect(() => {
+    const fetchTemplateItems = async () => {
+      if (!selectedCategory) {
+        setTemplateItems([])
+        return
+      }
+      
+      try {
+        const { data, error } = await supabase
+          .from("prepare_template_items")
+          .select("*")
+          .eq("category_id", selectedCategory.id)
+          .order("name")
+          
+        if (error) throw error
+        
+        setTemplateItems(data || [])
+      } catch (err: any) {
+        console.error("Error fetching template items:", err)
+        // Don't set error state to avoid UI disruption
+      }
+    }
+    
+    fetchTemplateItems()
+  }, [selectedCategory])
+  
+  // Function to add a new category
+  const handleAddCategory = async () => {
+    if (!user || !isAdmin) return
+    
+    if (!newCategory.name.trim()) {
+      setCategoriesError("Category name is required")
+      return
+    }
+    
+    setIsSavingCategory(true)
+    setCategoriesError(null)
+    
+    try {
+      // First verify that the user actually has admin status in the database
+      const { data: adminCheck, error: adminCheckError } = await supabase
+        .from("profiles")
+        .select("is_admin")
+        .eq("id", user.id)
+        .single()
+        
+      if (adminCheckError) {
+        throw new Error(`Failed to verify admin status: ${adminCheckError.message}`)
+      }
+      
+      if (!adminCheck?.is_admin) {
+        throw new Error("Your account doesn't have admin privileges in the database")
+      }
+      
+      const { data, error } = await supabase
+        .from("prepare_categories")
+        .insert({
+          name: newCategory.name.trim(),
+          description: newCategory.description.trim(),
+          icon: newCategory.icon.trim() || null
+        })
+        .select()
+        .single()
+        
+      if (error) {
+        // Provide a more specific error message for RLS violations
+        if (error.code === '42501' || error.message.includes('policy')) {
+          throw new Error(`Permission denied: ${error.message}. Please make sure your account has admin privileges.`)
+        }
+        throw error
+      }
+      
+      // Add new category to state
+      setCategories(prevCategories => [...prevCategories, data])
+      setSelectedCategory(data)
+      
+      // Reset form
+      setNewCategory({ name: "", description: "", icon: "" })
+      setIsAddingCategory(false)
+    } catch (err: any) {
+      console.error("Error adding category:", err)
+      setCategoriesError(err.message || "Failed to add category")
+    } finally {
+      setIsSavingCategory(false)
+    }
+  }
+  
+  // Function to update a category
+  const handleUpdateCategory = async () => {
+    if (!user || !isAdmin || !editingCategory) return
+    
+    if (!editingCategory.name.trim()) {
+      setCategoriesError("Category name is required")
+      return
+    }
+    
+    setIsSavingCategory(true)
+    setCategoriesError(null)
+    
+    try {
+      // First verify that the user actually has admin status in the database
+      const { data: adminCheck, error: adminCheckError } = await supabase
+        .from("profiles")
+        .select("is_admin")
+        .eq("id", user.id)
+        .single()
+        
+      if (adminCheckError) {
+        throw new Error(`Failed to verify admin status: ${adminCheckError.message}`)
+      }
+      
+      if (!adminCheck?.is_admin) {
+        throw new Error("Your account doesn't have admin privileges in the database")
+      }
+      
+      const { data, error } = await supabase
+        .from("prepare_categories")
+        .update({
+          name: editingCategory.name.trim(),
+          description: editingCategory.description.trim(),
+          icon: editingCategory.icon || null,
+          updated_at: new Date().toISOString()
+        })
+        .eq("id", editingCategory.id)
+        .select()
+        .single()
+        
+      if (error) {
+        // Provide a more specific error message for RLS violations
+        if (error.code === '42501' || error.message.includes('policy')) {
+          throw new Error(`Permission denied: ${error.message}. Please make sure your account has admin privileges.`)
+        }
+        throw error
+      }
+      
+      // Update category in state
+      setCategories(prevCategories => 
+        prevCategories.map(c => c.id === data.id ? data : c)
+      )
+      setSelectedCategory(data)
+      setEditingCategory(null)
+    } catch (err: any) {
+      console.error("Error updating category:", err)
+      setCategoriesError(err.message || "Failed to update category")
+    } finally {
+      setIsSavingCategory(false)
+    }
+  }
+  
+  // Function to add a new template item
+  const handleAddItem = async () => {
+    if (!user || !isAdmin || !selectedCategory) return
+    
+    if (!newItem.name.trim()) {
+      setCategoriesError("Item name is required")
+      return
+    }
+    
+    setIsSavingItem(true)
+    setCategoriesError(null)
+    
+    try {
+      // First verify that the user actually has admin status in the database
+      const { data: adminCheck, error: adminCheckError } = await supabase
+        .from("profiles")
+        .select("is_admin")
+        .eq("id", user.id)
+        .single()
+        
+      if (adminCheckError) {
+        throw new Error(`Failed to verify admin status: ${adminCheckError.message}`)
+      }
+      
+      if (!adminCheck?.is_admin) {
+        throw new Error("Your account doesn't have admin privileges in the database")
+      }
+      
+      const { data, error } = await supabase
+        .from("prepare_template_items")
+        .insert({
+          category_id: selectedCategory.id,
+          name: newItem.name.trim(),
+          description: newItem.description.trim() || null,
+          recommended_quantity: newItem.recommended_quantity,
+          unit: newItem.unit.trim()
+        })
+        .select()
+        .single()
+        
+      if (error) {
+        // Provide a more specific error message for RLS violations
+        if (error.code === '42501' || error.message.includes('policy')) {
+          throw new Error(`Permission denied: ${error.message}. Please make sure your account has admin privileges.`)
+        }
+        throw error
+      }
+      
+      // Add new item to state
+      setTemplateItems(prevItems => [...prevItems, data])
+      
+      // Reset form
+      setNewItem({ name: "", description: "", recommended_quantity: 1, unit: "item" })
+      setIsAddingItem(false)
+    } catch (err: any) {
+      console.error("Error adding template item:", err)
+      setCategoriesError(err.message || "Failed to add template item")
+    } finally {
+      setIsSavingItem(false)
     }
   }
 
@@ -450,7 +804,7 @@ export default function AdminPage() {
         </div>
 
         <Tabs defaultValue="create-alert" className="w-full">
-          <TabsList className="grid w-full grid-cols-4 mb-4">
+          <TabsList className="grid w-full grid-cols-5 mb-4">
             <TabsTrigger 
               value="create-alert" 
               className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm"
@@ -474,6 +828,12 @@ export default function AdminPage() {
               className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm"
             >
               Requested Items
+            </TabsTrigger>
+            <TabsTrigger 
+              value="manage-categories"
+              className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm"
+            >
+              Manage Category Lists
             </TabsTrigger>
           </TabsList>
 
@@ -870,6 +1230,366 @@ export default function AdminPage() {
                   ))}
                 </div>
               )}
+            </div>
+          </TabsContent>
+
+          <TabsContent value="manage-categories">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {/* Categories Panel */}
+              <Card className="md:col-span-1">
+                <CardHeader>
+                  <CardTitle className="flex justify-between items-center">
+                    <span>Emergency Categories</span>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={() => {
+                        setIsAddingCategory(true)
+                        setEditingCategory(null)
+                      }}
+                      disabled={isAddingCategory}
+                    >
+                      <PlusCircle className="h-4 w-4 mr-2" />
+                      Add
+                    </Button>
+                  </CardTitle>
+                  <CardDescription>
+                    Manage emergency categories and their suggested preparation items
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {isLoadingCategories ? (
+                    <div className="animate-pulse p-4 text-center">Loading categories...</div>
+                  ) : categoriesError && !isAddingCategory && !editingCategory ? (
+                    <div className="rounded-md bg-red-50 p-4 mb-4">
+                      <div className="flex">
+                        <div className="flex-shrink-0">
+                          <AlertTriangle className="h-5 w-5 text-red-400" />
+                        </div>
+                        <div className="ml-3">
+                          <h3 className="text-sm font-medium text-red-800">{categoriesError}</h3>
+                        </div>
+                      </div>
+                    </div>
+                  ) : null}
+                  
+                  {/* Add Category Form */}
+                  {isAddingCategory && (
+                    <Card className="mb-4 border border-dashed">
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-base">Add New Category</CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-2">
+                        <div>
+                          <Label htmlFor="categoryName">Name</Label>
+                          <Input
+                            id="categoryName"
+                            value={newCategory.name}
+                            onChange={(e) => setNewCategory({...newCategory, name: e.target.value})}
+                            placeholder="e.g., Earthquake"
+                            className="mt-1"
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="categoryDescription">Description</Label>
+                          <Textarea
+                            id="categoryDescription"
+                            value={newCategory.description}
+                            onChange={(e) => setNewCategory({...newCategory, description: e.target.value})}
+                            placeholder="Brief description of this emergency type"
+                            className="mt-1"
+                            rows={2}
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="categoryIcon">Icon (optional)</Label>
+                          <Input
+                            id="categoryIcon"
+                            value={newCategory.icon}
+                            onChange={(e) => setNewCategory({...newCategory, icon: e.target.value})}
+                            placeholder="e.g., earthquake, flood, flame"
+                            className="mt-1"
+                          />
+                        </div>
+                        {categoriesError && isAddingCategory && (
+                          <div className="text-sm text-red-500">{categoriesError}</div>
+                        )}
+                        <div className="flex justify-end space-x-2 pt-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setIsAddingCategory(false)
+                              setNewCategory({ name: "", description: "", icon: "" })
+                              setCategoriesError(null)
+                            }}
+                          >
+                            Cancel
+                          </Button>
+                          <Button
+                            size="sm"
+                            onClick={handleAddCategory}
+                            disabled={isSavingCategory || !newCategory.name.trim()}
+                          >
+                            {isSavingCategory ? "Saving..." : "Save"}
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+                  
+                  {/* Edit Category Form */}
+                  {editingCategory && (
+                    <Card className="mb-4 border border-dashed">
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-base">Edit Category</CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-2">
+                        <div>
+                          <Label htmlFor="editCategoryName">Name</Label>
+                          <Input
+                            id="editCategoryName"
+                            value={editingCategory.name}
+                            onChange={(e) => setEditingCategory({...editingCategory, name: e.target.value})}
+                            placeholder="e.g., Earthquake"
+                            className="mt-1"
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="editCategoryDescription">Description</Label>
+                          <Textarea
+                            id="editCategoryDescription"
+                            value={editingCategory.description}
+                            onChange={(e) => setEditingCategory({...editingCategory, description: e.target.value})}
+                            placeholder="Brief description of this emergency type"
+                            className="mt-1"
+                            rows={2}
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="editCategoryIcon">Icon (optional)</Label>
+                          <Input
+                            id="editCategoryIcon"
+                            value={editingCategory.icon || ""}
+                            onChange={(e) => setEditingCategory({...editingCategory, icon: e.target.value})}
+                            placeholder="e.g., earthquake, flood, flame"
+                            className="mt-1"
+                          />
+                        </div>
+                        {categoriesError && editingCategory && (
+                          <div className="text-sm text-red-500">{categoriesError}</div>
+                        )}
+                        <div className="flex justify-end space-x-2 pt-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setEditingCategory(null)
+                              setCategoriesError(null)
+                            }}
+                          >
+                            Cancel
+                          </Button>
+                          <Button
+                            size="sm"
+                            onClick={handleUpdateCategory}
+                            disabled={isSavingCategory || !editingCategory.name.trim()}
+                          >
+                            {isSavingCategory ? "Saving..." : "Save"}
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+                  
+                  {/* Categories List */}
+                  <div className="space-y-2 max-h-[500px] overflow-y-auto pr-2">
+                    {categories.length === 0 && !isLoadingCategories ? (
+                      <div className="text-center py-4 text-muted-foreground">
+                        No categories found. Add your first category.
+                      </div>
+                    ) : (
+                      categories.map((category) => (
+                        <Card 
+                          key={category.id} 
+                          className={`cursor-pointer transition-all hover:shadow ${
+                            selectedCategory?.id === category.id ? 'border-primary' : ''
+                          }`}
+                          onClick={() => setSelectedCategory(category)}
+                        >
+                          <CardContent className="p-4 flex justify-between items-center">
+                            <div>
+                              <h3 className="font-medium">{category.name}</h3>
+                              <p className="text-sm text-muted-foreground line-clamp-1">
+                                {category.description}
+                              </p>
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                setEditingCategory(category)
+                                setIsAddingCategory(false)
+                              }}
+                            >
+                              <Edit className="h-4 w-4" />
+                              <span className="sr-only">Edit</span>
+                            </Button>
+                          </CardContent>
+                        </Card>
+                      ))
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+              
+              {/* Template Items Panel */}
+              <Card className="md:col-span-2">
+                <CardHeader>
+                  <CardTitle className="flex justify-between items-center">
+                    <span>
+                      {selectedCategory 
+                        ? `Suggested Items for ${selectedCategory.name}` 
+                        : "Suggested Preparation Items"}
+                    </span>
+                    {selectedCategory && (
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={() => setIsAddingItem(true)}
+                        disabled={isAddingItem || !selectedCategory}
+                      >
+                        <PlusCircle className="h-4 w-4 mr-2" />
+                        Add Item
+                      </Button>
+                    )}
+                  </CardTitle>
+                  <CardDescription>
+                    {selectedCategory 
+                      ? `Manage suggested preparation items for ${selectedCategory.name} emergencies` 
+                      : "Select a category to manage its suggested preparation items"}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {!selectedCategory ? (
+                    <div className="text-center py-8 text-muted-foreground">
+                      Select a category to view and manage its suggested items
+                    </div>
+                  ) : (
+                    <>
+                      {/* Add Item Form */}
+                      {isAddingItem && (
+                        <Card className="mb-4 border border-dashed">
+                          <CardHeader className="pb-2">
+                            <CardTitle className="text-base">Add New Item</CardTitle>
+                          </CardHeader>
+                          <CardContent className="space-y-2">
+                            <div>
+                              <Label htmlFor="itemName">Name</Label>
+                              <Input
+                                id="itemName"
+                                value={newItem.name}
+                                onChange={(e) => setNewItem({...newItem, name: e.target.value})}
+                                placeholder="e.g., Emergency Water"
+                                className="mt-1"
+                              />
+                            </div>
+                            <div>
+                              <Label htmlFor="itemDescription">Description</Label>
+                              <Textarea
+                                id="itemDescription"
+                                value={newItem.description}
+                                onChange={(e) => setNewItem({...newItem, description: e.target.value})}
+                                placeholder="e.g., One gallon per person per day"
+                                className="mt-1"
+                                rows={2}
+                              />
+                            </div>
+                            <div className="grid grid-cols-2 gap-2">
+                              <div>
+                                <Label htmlFor="itemQuantity">Recommended Quantity</Label>
+                                <Input
+                                  id="itemQuantity"
+                                  type="number"
+                                  min="1"
+                                  value={newItem.recommended_quantity}
+                                  onChange={(e) => setNewItem({...newItem, recommended_quantity: parseInt(e.target.value) || 1})}
+                                  className="mt-1"
+                                />
+                              </div>
+                              <div>
+                                <Label htmlFor="itemUnit">Unit</Label>
+                                <Input
+                                  id="itemUnit"
+                                  value={newItem.unit}
+                                  onChange={(e) => setNewItem({...newItem, unit: e.target.value})}
+                                  placeholder="e.g., item, gallon, pack"
+                                  className="mt-1"
+                                />
+                              </div>
+                            </div>
+                            {categoriesError && isAddingItem && (
+                              <div className="text-sm text-red-500">{categoriesError}</div>
+                            )}
+                            <div className="flex justify-end space-x-2 pt-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  setIsAddingItem(false)
+                                  setNewItem({ name: "", description: "", recommended_quantity: 1, unit: "item" })
+                                  setCategoriesError(null)
+                                }}
+                              >
+                                Cancel
+                              </Button>
+                              <Button
+                                size="sm"
+                                onClick={handleAddItem}
+                                disabled={isSavingItem || !newItem.name.trim()}
+                              >
+                                {isSavingItem ? "Saving..." : "Save"}
+                              </Button>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      )}
+                      
+                      {/* Template Items List */}
+                      <div className="space-y-2 max-h-[600px] overflow-y-auto pr-2">
+                        {templateItems.length === 0 ? (
+                          <div className="text-center py-8 text-muted-foreground">
+                            No suggested items found for this category. Add your first item.
+                          </div>
+                        ) : (
+                          templateItems.map((item) => (
+                            <Card key={item.id}>
+                              <CardContent className="p-4">
+                                <div className="flex justify-between items-start">
+                                  <div>
+                                    <h3 className="font-medium">{item.name}</h3>
+                                    {item.description && (
+                                      <p className="text-sm text-muted-foreground mt-1">
+                                        {item.description}
+                                      </p>
+                                    )}
+                                    <div className="mt-2 text-sm">
+                                      <span className="inline-flex items-center bg-gray-700 px-2 py-1 rounded text-xs font-medium text-white">
+                                        {item.recommended_quantity} {item.unit}
+                                      </span>
+                                    </div>
+                                  </div>
+                                </div>
+                              </CardContent>
+                            </Card>
+                          ))
+                        )}
+                      </div>
+                    </>
+                  )}
+                </CardContent>
+              </Card>
             </div>
           </TabsContent>
         </Tabs>

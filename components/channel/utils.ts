@@ -1,8 +1,18 @@
 /**
  * Formats a date string as a "time ago" relative time
  * e.g., "5 minutes ago", "yesterday", "2 weeks ago", etc.
+ * 
+ * This function is safe for SSR by checking if window is defined
+ * and returning a simple timestamp during server-side rendering
  */
 export const timeAgo = (dateString: string) => {
+  // Check if we're on the client side
+  if (typeof window === 'undefined') {
+    // Return a simple formatted date when on the server
+    // This will be replaced on client-side hydration
+    return ""; // Empty timestamp that will be filled by client
+  }
+  
   const date = new Date(dateString);
   const now = new Date();
   const secondsAgo = Math.floor((now.getTime() - date.getTime()) / 1000);
