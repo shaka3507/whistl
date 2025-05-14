@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { 
   Users,
@@ -42,6 +42,8 @@ interface ChannelHeaderProps {
   handleInviteUser: (e: React.FormEvent) => Promise<void>;
   currentView: 'chat' | 'supplies' | 'wellness';
   setCurrentView: (view: 'chat' | 'supplies' | 'wellness') => void;
+  inviteStatus: "idle" | "sending" | "sent";
+  inviteError: string | null;
 }
 
 export default function ChannelHeader({
@@ -54,9 +56,29 @@ export default function ChannelHeader({
   setInviteEmail,
   handleInviteUser,
   currentView,
-  setCurrentView
+  setCurrentView,
+  inviteStatus,
+  inviteError
 }: ChannelHeaderProps) {
   const [membersDialogOpen, setMembersDialogOpen] = useState(false);
+  
+  // Add a safety mechanism to ensure invite button doesn't get stuck in sending state
+  useEffect(() => {
+    let timeoutId: NodeJS.Timeout | null = null;
+    
+    if (inviteStatus === "sending") {
+      timeoutId = setTimeout(() => {
+        console.warn("Invite button has been in sending state for too long, resetting UI...");
+        // We can't directly modify inviteStatus here as it's a prop,
+        // but we can close the dialog which will reset the UI
+        setMembersDialogOpen(false);
+      }, 15000); // 15 seconds is plenty of time for any reasonable network request
+    }
+    
+    return () => {
+      if (timeoutId) clearTimeout(timeoutId);
+    };
+  }, [inviteStatus]);
 
   return (
     <div className="border-b w-full">
@@ -108,7 +130,16 @@ export default function ChannelHeader({
             <Activity className="h-4 w-4 sm:mr-1" />
             <span className="hidden sm:inline">Wellness</span>
           </Button>
-          <Dialog open={membersDialogOpen} onOpenChange={setMembersDialogOpen}>
+          <Dialog 
+            open={membersDialogOpen} 
+            onOpenChange={(open) => {
+              setMembersDialogOpen(open);
+              // If dialog is closing and invite is still in progress, reset the email field
+              if (!open && inviteStatus === "sending") {
+                setInviteEmail("");
+              }
+            }}
+          >
             <DialogTrigger asChild>
               <Button variant="outline" size="sm" className="flex-shrink-0 px-2 sm:px-3 rounded-full transition-colors hover:bg-purple-100 hover:text-purple-700 hover:border-purple-300 dark:hover:bg-purple-800/30 dark:hover:text-purple-400">
                 <Users className="h-4 w-4 sm:mr-1" />
@@ -147,19 +178,15 @@ export default function ChannelHeader({
                 ))}
               </div>
               
-              {/* Display error or success message */}
-              {error && (
-                <div className={`rounded-md p-3 mt-3 break-words ${error.toLowerCase().includes('failed') || error.toLowerCase().includes('error') ? 'bg-red-50 text-red-800' : 'bg-green-50 text-green-800'}`}>
+              {/* Only display general error messages, not invitation success messages */}
+              {error && error.toLowerCase().includes('failed') && (
+                <div className="rounded-md bg-red-50 p-3 mt-3 break-words">
                   <div className="flex items-start">
                     <div className="flex-shrink-0">
-                      {error.toLowerCase().includes('failed') || error.toLowerCase().includes('error') ? (
-                        <AlertTriangle className="h-5 w-5 text-red-400" />
-                      ) : (
-                        <Check className="h-5 w-5 text-green-400" />
-                      )}
+                      <AlertTriangle className="h-5 w-5 text-red-400" />
                     </div>
                     <div className="ml-3">
-                      <p className="text-sm font-medium">{error}</p>
+                      <p className="text-sm font-medium text-red-800">{error}</p>
                     </div>
                   </div>
                 </div>
@@ -174,10 +201,35 @@ export default function ChannelHeader({
                       onChange={(e) => setInviteEmail(e.target.value)}
                       type="email"
                       required
+                      disabled={inviteStatus !== "idle"}
                       className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                     />
-                    <Button type="submit">Invite</Button>
+                    <Button 
+                      type="submit"
+                      disabled={inviteStatus !== "idle" && inviteStatus !== "sent"}
+                      className={inviteStatus === "sent" ? "bg-green-600 hover:bg-green-700" : ""}
+                    >
+                      {inviteStatus === "sending" ? (
+                        <span className="flex items-center gap-1">
+                          <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent"></span>
+                          Sending...
+                        </span>
+                      ) : inviteStatus === "sent" ? (
+                        <span className="flex items-center gap-1">
+                          <Check className="h-4 w-4" />
+                          Sent!
+                        </span>
+                      ) : (
+                        "Invite"
+                      )}
+                    </Button>
                   </div>
+                  {inviteError && (
+                    <div className="mt-2 text-xs text-red-600 flex items-start gap-1">
+                      <AlertTriangle className="h-3 w-3 flex-shrink-0 mt-0.5" />
+                      <span>{inviteError}</span>
+                    </div>
+                  )}
                 </form>
               )}
             </DialogContent>

@@ -95,6 +95,8 @@ export default function ChannelPage() {
   const [newMessage, setNewMessage] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isSending, setIsSending] = useState(false);
+  const [inviteStatus, setInviteStatus] = useState<"idle" | "sending" | "sent">("idle");
+  const [inviteError, setInviteError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [userRole, setUserRole] = useState<"admin" | "member">("member");
   const [inviteEmail, setInviteEmail] = useState("");
@@ -315,11 +317,26 @@ export default function ChannelPage() {
     e.preventDefault();
     if (!user || !channel || !inviteEmail.trim()) return;
 
-    setIsSending(true);
-    setError(null);
+    // Store whether this specific invitation attempt has completed
+    let invitationCompleted = false;
+    
+    setInviteStatus("sending");
+    setInviteError(null);
+    
+    // Safety timeout - ensure we don't stay in "sending" state forever
+    const safetyTimeout = setTimeout(() => {
+      if (!invitationCompleted) {
+        console.warn("Invitation request timed out after 10 seconds");
+        setInviteStatus("idle");
+        setInviteError("Request timed out. Please try again.");
+      }
+    }, 10000); // 10 seconds timeout
 
     try {
-      const response = await fetch("/api/send-channel-email-notifications", {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 8000); // Abort fetch after 8 seconds
+      
+      const response = await fetch("/api/send-invite", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -327,10 +344,12 @@ export default function ChannelPage() {
         body: JSON.stringify({
           email: inviteEmail.trim(),
           channelId: channel.id,
-          userId: user.id,
-          type: "invite",
+          userId: user.id
         }),
+        signal: controller.signal
       });
+      
+      clearTimeout(timeoutId);
 
       const result = await response.json();
 
@@ -338,8 +357,14 @@ export default function ChannelPage() {
         throw new Error(result.error || "Failed to send invitation");
       }
 
+      invitationCompleted = true;
       setInviteEmail("");
-      setError("Invitation sent successfully!");
+      setInviteStatus("sent");
+      
+      // Reset invite status after 2 seconds
+      setTimeout(() => {
+        setInviteStatus("idle");
+      }, 2000);
       
       // If a user was actually added (existing user), refresh members
       if (result.userAdded) {
@@ -357,10 +382,17 @@ export default function ChannelPage() {
         }
       }
     } catch (err: any) {
+      invitationCompleted = true;
       console.error("Error inviting user:", err);
-      setError(err.message || "Failed to send invitation");
+      if (err.name === 'AbortError') {
+        setInviteError("Request timed out. Please try again.");
+      } else {
+        setInviteError(err.message || "Failed to send invitation");
+      }
+      setInviteStatus("idle");
     } finally {
-      setIsSending(false);
+      // Always clear the safety timeout
+      clearTimeout(safetyTimeout);
     }
   };
 
@@ -779,6 +811,8 @@ export default function ChannelPage() {
           handleInviteUser={handleInviteUser}
           currentView={currentView}
           setCurrentView={setCurrentView}
+          inviteStatus={inviteStatus}
+          inviteError={inviteError}
         />
 
         <div className="flex-1 flex flex-col md:flex-row">
