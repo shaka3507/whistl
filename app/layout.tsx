@@ -17,7 +17,30 @@ const manrope = Manrope({
 export const metadata: Metadata = {
   title: "whistl - emergency preparedness platform",
   description: "Coordinate emergency response and crisis management",
-  generator: 'v0.dev + shaka c'
+  generator: 'v0.dev + shaka c',
+  icons: {
+    icon: [
+      {
+        media: '(prefers-color-scheme: light)',
+        url: '/favicon.svg',
+        href: '/favicon.svg',
+      },
+      {
+        media: '(prefers-color-scheme: dark)',
+        url: '/favicon/favicon-dark.svg',
+        href: '/favicon/favicon-dark.svg',
+      },
+    ],
+    apple: [
+      { url: '/apple-touch-icon.svg' }
+    ],
+    other: [
+      {
+        rel: 'mask-icon',
+        url: '/favicon.svg',
+      }
+    ]
+  }
 }
 
 export default function RootLayout({
