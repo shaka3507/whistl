@@ -28,7 +28,13 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={manrope.className}>
-        <ThemeProvider attribute="class" defaultTheme="dark" enableSystem>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="dark"
+          enableSystem={false}
+          storageKey="whistl-theme"
+          disableTransitionOnChange
+        >
           <AuthProvider>{children}</AuthProvider>
           <Toaster />
         </ThemeProvider>

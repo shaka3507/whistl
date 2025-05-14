@@ -10,6 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Bell } from "lucide-react";
 import type { Database } from "@/lib/supabase-types";
 import { timeAgo } from "./utils";
+import { ClientOnly } from "@/components/client-only";
 
 type Message = Database["public"]["Tables"]["messages"]["Row"] & {
   profiles: Database["public"]["Tables"]["profiles"]["Row"];
@@ -96,7 +97,9 @@ export default function ChatView({
                       <div className="text-center mb-4">
                         <h3 className="text-lg font-semibold mt-4">Alert</h3>
                         <div className="text-xs text-muted-foreground">
-                          {timeAgo(message.created_at)}
+                          <ClientOnly>
+                            {timeAgo(message.created_at)}
+                          </ClientOnly>
                         </div>
                       </div>
                       
@@ -139,7 +142,9 @@ export default function ChatView({
                             Alert
                           </div>
                           <div className="text-xs text-muted-foreground ml-2">
-                            {timeAgo(message.created_at)}
+                            <ClientOnly>
+                              {timeAgo(message.created_at)}
+                            </ClientOnly>
                           </div>
                         </div>
                         <Button 
@@ -196,7 +201,9 @@ export default function ChatView({
                         {message.profiles.full_name}
                       </div>
                       <div className="text-xs text-muted-foreground">
-                        {timeAgo(message.created_at)}
+                        <ClientOnly>
+                          {timeAgo(message.created_at)}
+                        </ClientOnly>
                       </div>
                     </div>
                     <div className="mt-1">
