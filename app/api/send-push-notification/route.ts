@@ -17,7 +17,13 @@ webpush.setVapidDetails(
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { channelId, title, messageBody, url } = body;
+    const { 
+      channelId, 
+      title, 
+      messageBody, 
+      url,
+      requiresAcknowledgment = true // Default to true for push notifications
+    } = body;
 
     // Validate required fields
     if (!channelId || !title || !messageBody) {
@@ -40,6 +46,29 @@ export async function POST(request: Request) {
     }
     
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+
+    // First, create a message to store the notification
+    const { data: message, error: messageError } = await supabaseAdmin
+      .from('messages')
+      .insert({
+        channel_id: channelId,
+        content: messageBody,
+        // Use the system user or admin user as the sender
+        user_id: body.senderId || '00000000-0000-0000-0000-000000000000', // Replace with actual system user ID
+        is_notification: true,
+        notification_type: 'push',
+        requires_acknowledgment: requiresAcknowledgment
+      })
+      .select()
+      .single();
+
+    if (messageError) {
+      console.error('Error creating message for notification:', messageError);
+      return NextResponse.json(
+        { error: 'Failed to create message for notification', details: messageError.message },
+        { status: 500 }
+      );
+    }
 
     // Get all channel members to send notifications to
     const { data: channelMembers, error: membersError } = await supabaseAdmin
@@ -92,7 +121,9 @@ export async function POST(request: Request) {
       title: title,
       body: messageBody,
       url: url || '/',
-      tag: 'notification'
+      tag: `notification-${message.id}`,
+      messageId: message.id,
+      requiresAcknowledgment: requiresAcknowledgment
     });
 
     // Send notifications to all subscriptions
@@ -121,7 +152,8 @@ export async function POST(request: Request) {
       message: `Push notification sent to ${successful} subscribers (${failed} failed)`,
       sent: successful,
       failed: failed,
-      total: userIds.length
+      total: userIds.length,
+      messageId: message.id
     });
   } catch (error: any) {
     console.error('Error in send-push-notification API route:', error);

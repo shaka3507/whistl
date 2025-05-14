@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef } from "react";
-import { Send, MessageSquare } from "lucide-react";
+import { Send, MessageSquare, CheckCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -12,10 +12,24 @@ import type { Database } from "@/lib/supabase-types";
 import { timeAgo } from "./utils";
 import { ClientOnly } from "@/components/client-only";
 
-type Message = Database["public"]["Tables"]["messages"]["Row"] & {
-  profiles: Database["public"]["Tables"]["profiles"]["Row"];
+interface Message {
+  id: string;
+  created_at: string;
+  content: string;
+  is_notification: boolean;
   notification_type?: "push" | "standard";
-};
+  user_id: string;
+  channel_id: string;
+  parent_id?: string;
+  has_attachment?: boolean;
+  profiles: {
+    id: string;
+    full_name: string;
+    avatar_url?: string;
+  };
+  isAcknowledged?: boolean;
+  requires_acknowledgment?: boolean;
+}
 
 interface ChatViewProps {
   messages: Message[];
@@ -112,16 +126,23 @@ export default function ChatView({
                       </div>
                       
                       <div className="flex items-center justify-center mt-4 pt-2 border-t">
-                        <Button
-                          size="lg"
-                          onClick={() => {
-                            acknowledgeMessage(message.id);
-                            dismissNotification(message.id);
-                          }}
-                          className="rounded-full px-6"
-                        >
-                          Acknowledge
-                        </Button>
+                        {message.isAcknowledged ? (
+                          <div className="flex items-center text-green-600 gap-2">
+                            <CheckCircle className="h-5 w-5" />
+                            <span>Acknowledged</span>
+                          </div>
+                        ) : (
+                          <Button
+                            size="lg"
+                            onClick={() => {
+                              acknowledgeMessage(message.id);
+                              dismissNotification(message.id);
+                            }}
+                            className="rounded-full px-6"
+                          >
+                            Acknowledge
+                          </Button>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -147,14 +168,35 @@ export default function ChatView({
                             </ClientOnly>
                           </div>
                         </div>
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
-                          onClick={() => dismissNotification(message.id)}
-                          className="h-6 px-3 rounded-full text-xs"
-                        >
-                          Dismiss
-                        </Button>
+                        <div className="flex items-center gap-2">
+                          {message.requires_acknowledgment && (
+                            <div className="flex items-center">
+                              {message.isAcknowledged ? (
+                                <div className="flex items-center text-green-600 gap-1 text-xs">
+                                  <CheckCircle className="h-3 w-3" />
+                                  <span>Acknowledged</span>
+                                </div>
+                              ) : (
+                                <Button 
+                                  variant="outline" 
+                                  size="sm" 
+                                  onClick={() => acknowledgeMessage(message.id)}
+                                  className="h-6 px-3 rounded-full text-xs"
+                                >
+                                  Acknowledge
+                                </Button>
+                              )}
+                            </div>
+                          )}
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            onClick={() => dismissNotification(message.id)}
+                            className="h-6 px-3 rounded-full text-xs"
+                          >
+                            Dismiss
+                          </Button>
+                        </div>
                       </div>
                       <div className="mt-1 flex items-start gap-2">
                         <div className="flex-1">

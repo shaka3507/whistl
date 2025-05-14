@@ -258,11 +258,16 @@ export default function ChannelPage() {
     if (!id) return;
     
     try {
+      // Get the messages for this channel
       const { data, error } = await supabase
         .from("messages")
         .select(`
           *,
-          profiles(*)
+          profiles:user_id (
+            id,
+            full_name,
+            avatar_url
+          )
         `)
         .eq("channel_id", id)
         .order("created_at", { ascending: true });
@@ -271,16 +276,47 @@ export default function ChannelPage() {
         throw error;
       }
 
-      setMessages(data || []);
+      if (!data) {
+        setMessages([]);
+        return;
+      }
 
+      // If the user is logged in, fetch their message acknowledgments
+      if (user) {
+        const { data: acknowledgments, error: ackError } = await supabase
+          .from("message_acknowledgments")
+          .select("message_id")
+          .eq("user_id", user.id);
+
+        if (ackError) {
+          console.error("Error fetching acknowledgments:", ackError);
+        }
+
+        // Convert acknowledgments to a set for quick lookup
+        const acknowledgedMessageIds = new Set(
+          acknowledgments?.map((ack) => ack.message_id) || []
+        );
+
+        // Mark messages as acknowledged or not
+        const messagesWithAck = data.map((message) => ({
+          ...message,
+          isAcknowledged: acknowledgedMessageIds.has(message.id),
+        }));
+
+        setMessages(messagesWithAck);
+      } else {
+        setMessages(data);
+      }
+      
       // Scroll to bottom after messages load
       setTimeout(() => {
         if (messagesEndRef.current) {
           messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
         }
       }, 100);
-    } catch (err) {
+    } catch (err: any) {
       console.error("Error fetching messages:", err);
+      setError(err.message);
     }
   };
 
@@ -455,12 +491,40 @@ export default function ChannelPage() {
     if (!user) return;
     
     try {
-      await supabase.from("message_acknowledgments").insert({
+      // First, update the local state for immediate feedback
+      setMessages((prevMessages) =>
+        prevMessages.map((msg) =>
+          msg.id === messageId ? { ...msg, isAcknowledged: true } : msg
+        )
+      );
+      
+      // Insert the acknowledgment in the database
+      const { error } = await supabase.from("message_acknowledgments").insert({
         message_id: messageId,
         user_id: user.id,
+        acknowledged_at: new Date().toISOString()
       });
+
+      if (error) {
+        console.error("Error acknowledging message:", error);
+        toast({
+          title: "Error",
+          description: "Failed to acknowledge notification. Please try again.",
+          variant: "destructive",
+        });
+        
+        // Revert the optimistic update if there was an error
+        await fetchMessages();
+      } else {
+        toast({
+          title: "Notification acknowledged",
+          description: "Your acknowledgment has been recorded.",
+        });
+      }
     } catch (err) {
       console.error("Error acknowledging message:", err);
+      // Revert the optimistic update if there was an error
+      await fetchMessages();
     }
   };
 

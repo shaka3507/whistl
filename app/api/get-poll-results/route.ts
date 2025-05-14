@@ -10,6 +10,7 @@ type PollResult = {
   createdAt: string;
   minValue: number;
   maxValue: number;
+  created_by: string;
   stats: {
     total: number;
     average: number;
@@ -252,7 +253,7 @@ export async function GET(request: Request) {
       // Get members who have not responded
       const respondedUserIds = new Set(filteredResponses.map(r => r.user_id));
       const nonRespondedMembers = channelMembers
-        ?.filter(m => !respondedUserIds.has(m.user_id))
+        ?.filter(m => !respondedUserIds.has(m.user_id) && m.user_id !== poll.created_by)
         .map(m => ({
           userId: m.user_id,
           fullName: userProfiles[m.user_id]?.full_name || 'Unknown',
@@ -266,6 +267,7 @@ export async function GET(request: Request) {
         createdAt: poll.created_at,
         minValue: poll.min_value,
         maxValue: poll.max_value,
+        created_by: poll.created_by,
         stats: {
           total,
           average,

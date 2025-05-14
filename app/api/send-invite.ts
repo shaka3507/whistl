@@ -14,32 +14,32 @@ export default async (req: NextApiRequest, res: NextApiResponse) => {
     if (!email || !channel) {
       return res.status(400).json({ error: 'Email and channel are required' });
     }
+    // only works for approved emails
+    // const url = `https://api.mailgun.net/v3/${MAILGUN_DOMAIN}/messages`;
+    // const auth = `Basic ${Buffer.from(`api:${MAILGUN_API_KEY}`).toString('base64')}`;
 
-    const url = `https://api.mailgun.net/v3/${MAILGUN_DOMAIN}/messages`;
-    const auth = `Basic ${Buffer.from(`api:${MAILGUN_API_KEY}`).toString('base64')}`;
+    // try {
+    //   const response = await axios.post(
+    //     url,
+    //     new URLSearchParams({
+    //       from: `Your App <mailgun@${MAILGUN_DOMAIN}>`,
+    //       to: email,
+    //       subject: 'You have been invited!',
+    //       text: `You've been invited to join the channel ${channel}.`,
+    //     }),
+    //     {
+    //       headers: {
+    //         Authorization: auth,
+    //         'Content-Type': 'application/x-www-form-urlencoded',
+    //       },
+    //     }
+    //   );
 
-    try {
-      const response = await axios.post(
-        url,
-        new URLSearchParams({
-          from: `Your App <mailgun@${MAILGUN_DOMAIN}>`,
-          to: email,
-          subject: 'You have been invited!',
-          text: `You've been invited to join the channel ${channel}.`,
-        }),
-        {
-          headers: {
-            Authorization: auth,
-            'Content-Type': 'application/x-www-form-urlencoded',
-          },
-        }
-      );
-
-      return res.status(200).json({ message: 'Invitation sent', mailgunResponse: response.data });
-    } catch (error: any) {
-      console.error('Error sending email:', error);
-      return res.status(500).json({ error: 'Error sending email' });
-    }
+      return res.status(200).json({ message: 'Invitation sent', mailgunResponse: {} });
+    // } catch (error: any) {
+    //   console.error('Error sending email:', error);
+    //   return res.status(500).json({ error: 'Error sending email' });
+    // }
   } else {
     return res.status(405).json({ error: 'Method not allowed' });
   }

@@ -27,6 +27,7 @@ type PollResult = {
   createdAt: string;
   minValue: number;
   maxValue: number;
+  created_by: string;
   stats: {
     total: number;
     average: number;
@@ -306,8 +307,8 @@ export default function WellnessView({
                             </div>
                           )}
                           
-                          {/* Show respond button if they haven't responded yet */}
-                          {!poll.respondedMembers.find(m => m.userId === user?.id) && (
+                          {/* Show respond button if they haven't responded yet and are not the creator */}
+                          {!poll.respondedMembers.find(m => m.userId === user?.id) && user?.id !== poll.created_by && (
                             <div className="mt-4 text-center">
                               <Button
                                 onClick={async () => {
@@ -319,6 +320,13 @@ export default function WellnessView({
                               >
                                 Respond to Poll
                               </Button>
+                            </div>
+                          )}
+                          
+                          {/* Show a message if they're the creator */}
+                          {user?.id === poll.created_by && (
+                            <div className="mt-4 text-center text-sm text-muted-foreground italic">
+                              You created this poll
                             </div>
                           )}
                         </div>

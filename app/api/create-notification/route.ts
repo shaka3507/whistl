@@ -17,6 +17,7 @@ export async function POST(request: Request) {
       content, 
       isNotification = true, 
       notificationType,
+      requiresAcknowledgment = notificationType === 'push', // Default to true for push notifications
       sendEmailNotifications = true // Add flag to control email notifications
     } = body;
 
@@ -50,7 +51,8 @@ export async function POST(request: Request) {
         user_id: userId,
         content: content,
         is_notification: isNotification,
-        notification_type: notificationType
+        notification_type: notificationType,
+        requires_acknowledgment: requiresAcknowledgment
       })
       .select()
       .single();
@@ -63,41 +65,53 @@ export async function POST(request: Request) {
       );
     }
 
-    // Optionally send email notifications
-    let emailResult = null;
-    if (sendEmailNotifications) {
+    // If it's a push notification, send it to all channel members
+    if (notificationType === 'push') {
       try {
-        // Get channel details for the email
-        const { data: channel } = await supabaseAdmin
-          .from('channels')
-          .select('name')
-          .eq('id', channelId)
-          .single();
-          
-        // Don't wait for the email API call to complete
-        emailResult = axios.post('/api/send-channel-email-notifications', {
-          channelId,
-          subject: 'New Notification in Channel',
-          text: content,
-          excludeUserId: userId // Don't send to the creator
-        }).catch(error => {
-          console.error('Error sending email notifications:', error);
-          return { error: true, message: error.message };
+        const response = await axios.post(`${APP_URL}/api/send-push-notification`, {
+          channelId: channelId,
+          title: 'Notification',
+          messageBody: content,
+          messageId: data.id,
+          url: `/channels/${channelId}?notification=${data.id}`,
+          senderId: userId,
+          requiresAcknowledgment: requiresAcknowledgment
         });
-      } catch (emailError) {
-        console.error('Error preparing email notifications:', emailError);
+        
+        console.log('Push notification sent:', response.data);
+      } catch (error) {
+        console.error('Error sending push notification:', error);
+        // Continue even if push notification fails
       }
     }
 
-    return NextResponse.json({ 
-      success: true, 
-      message: data,
-      emailNotifications: sendEmailNotifications ? 'queued' : 'skipped'
+    // Send email notifications if requested
+    if (sendEmailNotifications) {
+      try {
+        const response = await axios.post(`${APP_URL}/api/send-channel-email-notifications`, {
+          channelId: channelId,
+          senderId: userId,
+          message: content,
+          type: 'notification',
+          notificationId: data.id
+        });
+        
+        console.log('Email notifications sent:', response.data);
+      } catch (error) {
+        console.error('Error sending email notifications:', error);
+        // Continue even if email sending fails
+      }
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: 'Notification created successfully',
+      notification: data
     });
   } catch (error: any) {
     console.error('Error in create-notification API route:', error);
     return NextResponse.json(
-      { error: 'Server error', details: error.message, stack: error.stack },
+      { error: 'Server error', details: error.message },
       { status: 500 }
     );
   }
