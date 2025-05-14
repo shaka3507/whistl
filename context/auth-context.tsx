@@ -767,11 +767,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
       // Force clear local storage
       try {
-        localStorage.removeItem('supabase.auth.token');
-        localStorage.removeItem('whistl-auth-token');
-        localStorage.removeItem('whistl-session');
         Object.keys(localStorage).forEach(key => {
-          if (key.includes('auth') || key.includes('token') || key.includes('session')) {
+          if (key.includes('whistl-profile') || key.includes('token') || key.includes('session')) {
             localStorage.removeItem(key);
           }
         });
@@ -804,37 +801,70 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.log("Starting profile update for user:", user.id);
       console.log("Update payload:", updates);
       
+      // Validate the update fields 
+      const sanitizedUpdates: Partial<Profile> = { ...updates };
+      
+      // Ensure string fields are properly trimmed
+      if (typeof sanitizedUpdates.full_name === 'string') {
+        sanitizedUpdates.full_name = sanitizedUpdates.full_name.trim();
+      }
+      
+      if (typeof sanitizedUpdates.username === 'string') {
+        sanitizedUpdates.username = sanitizedUpdates.username.trim();
+      }
+      
+      // Handle any additional fields with type safety
+      const anyUpdates = sanitizedUpdates as any;
+      if (typeof anyUpdates.notes === 'string') {
+        anyUpdates.notes = anyUpdates.notes.trim();
+      }
+      
+      console.log("Sanitized update payload:", sanitizedUpdates);
+      
       // Create update with retry
       const updateProfileFn = async () => {
-        const response = await supabase
-          .from("profiles")
-          .update({ ...updates, updated_at: new Date().toISOString() })
-          .eq("id", user.id);
+        try {
+          const response = await supabase
+            .from("profiles")
+            .update({ ...sanitizedUpdates, updated_at: new Date().toISOString() })
+            .eq("id", user.id)
+            .select();
           
-        if (response.error) {
-          console.error("Supabase update error:", {
-            status: response.error.code,
-            message: response.error.message,
-            details: response.error.details,
-            hint: response.error.hint
-          });
+          if (response.error) {
+            console.error("Supabase update error:", {
+              status: response.error.code,
+              message: response.error.message,
+              details: response.error.details,
+              hint: response.error.hint
+            });
+          } else {
+            console.log("Profile update database response:", response);
+          }
+          
+          return response;
+        } catch (err) {
+          console.error("Exception in Supabase update call:", err);
+          throw err;
         }
-        
-        return response;
       };
 
-      const { error } = await fetchWithRetry(updateProfileFn);
+      try {
+        const { error } = await fetchWithRetry(updateProfileFn);
 
-      if (error) {
-        console.error("Update profile error:", error);
-        return { error };
+        if (error) {
+          console.error("Update profile error:", error);
+          return { error };
+        }
+
+        // Refresh profile data
+        await fetchProfile(user.id);
+        console.log("Profile updated successfully, fetched fresh profile data");
+
+        return { error: null };
+      } catch (err) {
+        console.error("Error in retry mechanism:", err);
+        throw err;
       }
-
-      // Refresh profile data
-      await fetchProfile(user.id);
-      console.log("Profile updated successfully");
-
-      return { error: null };
     } catch (err) {
       console.error("Error updating profile:", err);
       return { error: err as Error };

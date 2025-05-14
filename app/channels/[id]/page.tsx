@@ -6,6 +6,7 @@ import { useAuth } from "@/context/auth-context";
 import { Header } from "@/components/header";
 import { AlertTriangle } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
+import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabase";
 import type { Database } from "@/lib/supabase-types";
@@ -192,6 +193,37 @@ export default function ChannelPage() {
           // Don't throw here, we can continue without the alert
         } else {
           setAlert(alertData || null);
+          
+          // If there's an active alert, check if the current user has acknowledged it
+          if (alertData && alertData.requires_acknowledgment) {
+            // First check localStorage for cached acknowledgment to avoid flicker on refresh
+            const localAcks = JSON.parse(localStorage.getItem('alertAcknowledgments') || '{}');
+            if (localAcks[alertData.id]) {
+              setAlertAcknowledged(true);
+              setShowAcknowledgePrompt(false);
+            } else {
+              // If not in localStorage, check the database
+              const { data: ackData, error: ackError } = await supabase
+                .from("alert_acknowledgments")
+                .select("*")
+                .eq("alert_id", alertData.id)
+                .eq("user_id", user.id)
+                .single();
+                
+              if (ackError && ackError.code !== 'PGRST116') {
+                console.error("Error fetching alert acknowledgment:", ackError);
+              } else if (ackData) {
+                // Store in localStorage for future fast lookups
+                localAcks[alertData.id] = true;
+                localStorage.setItem('alertAcknowledgments', JSON.stringify(localAcks));
+                setAlertAcknowledged(true);
+                setShowAcknowledgePrompt(false);
+              } else {
+                setAlertAcknowledged(false);
+                setShowAcknowledgePrompt(alertData.requires_acknowledgment);
+              }
+            }
+          }
         }
 
         // Fetch channel members
@@ -242,6 +274,22 @@ export default function ChannelPage() {
           setRequestedItems(requestedItemsData || []);
         }
 
+        // Check if this alert has been dismissed by the current user
+        const { data: alertDismissed, error: dismissError } = await supabase
+          .from("alert_dismissals")
+          .select("*")
+          .eq("alert_id", alertData.id)
+          .eq("user_id", user.id)
+          .single();
+        
+        if (dismissError && dismissError.code !== 'PGRST116') {
+          console.error("Error checking alert dismissal:", dismissError);
+        } else if (alertDismissed) {
+          // If this alert was dismissed, redirect to channels page
+          window.location.href = "/channels";
+          return;
+        }
+
       } catch (err: any) {
         console.error("Error fetching channel data:", err);
         setError(err.message || "Failed to load channel data");
@@ -281,26 +329,31 @@ export default function ChannelPage() {
         return;
       }
 
-      // If the user is logged in, fetch their message acknowledgments
+      // If the user is logged in, fetch their message dismissals
       if (user) {
-        const { data: acknowledgments, error: ackError } = await supabase
-          .from("message_acknowledgments")
+        // Fetch message dismissals - we use this table for both dismiss and acknowledge operations
+        const { data: dismissals, error: dismissError } = await supabase
+          .from("message_dismissals")
           .select("message_id")
           .eq("user_id", user.id);
 
-        if (ackError) {
-          console.error("Error fetching acknowledgments:", ackError);
+        if (dismissError) {
+          console.error("Error fetching dismissals:", dismissError);
         }
-
-        // Convert acknowledgments to a set for quick lookup
-        const acknowledgedMessageIds = new Set(
-          acknowledgments?.map((ack) => ack.message_id) || []
+        
+        // Convert dismissals to a set for quick lookup
+        const dismissedMessageIds = new Set(
+          dismissals?.map((dismissal) => dismissal.message_id) || []
         );
 
-        // Mark messages as acknowledged or not
+        // Set the dismissed notifications in state
+        setDismissedNotifications(Array.from(dismissedMessageIds));
+
+        // Mark messages as acknowledged based on whether they've been dismissed
+        // For our purposes, a dismissed message is also considered acknowledged
         const messagesWithAck = data.map((message) => ({
           ...message,
-          isAcknowledged: acknowledgedMessageIds.has(message.id),
+          isAcknowledged: dismissedMessageIds.has(message.id),
         }));
 
         setMessages(messagesWithAck);
@@ -483,7 +536,36 @@ export default function ChannelPage() {
 
   // Function to dismiss notifications
   const dismissNotification = async (messageId: string) => {
-    setDismissedNotifications((prev) => [...prev, messageId]);
+    if (!user) return;
+    
+    try {
+      // First, update the local state for immediate feedback
+      setDismissedNotifications((prev) => [...prev, messageId]);
+      
+      // Insert the dismissal in the database
+      const { error } = await supabase.from("message_dismissals").insert({
+        message_id: messageId,
+        user_id: user.id,
+        dismissed_at: new Date().toISOString(),
+        created_at: new Date().toISOString()
+      });
+
+      if (error) {
+        console.error("Error dismissing message:", error);
+        // If there was an error, revert the local state change
+        setDismissedNotifications((prev) => prev.filter(id => id !== messageId));
+        
+        toast({
+          title: "Error",
+          description: "Failed to dismiss notification. Please try again.",
+          variant: "destructive",
+        });
+      }
+    } catch (err) {
+      console.error("Error dismissing message:", err);
+      // Revert the optimistic update if there was an error
+      setDismissedNotifications((prev) => prev.filter(id => id !== messageId));
+    }
   };
 
   // Function to acknowledge messages
@@ -498,11 +580,15 @@ export default function ChannelPage() {
         )
       );
       
-      // Insert the acknowledgment in the database
-      const { error } = await supabase.from("message_acknowledgments").insert({
+      // Also update the dismissedNotifications state
+      setDismissedNotifications((prev) => [...prev, messageId]);
+      
+      // Insert the acknowledgment in the message_dismissals table
+      const { error } = await supabase.from("message_dismissals").insert({
         message_id: messageId,
         user_id: user.id,
-        acknowledged_at: new Date().toISOString()
+        dismissed_at: new Date().toISOString(),
+        created_at: new Date().toISOString()
       });
 
       if (error) {
@@ -699,13 +785,24 @@ export default function ChannelPage() {
   const respondToPoll = async (pollId: string) => {
     if (!user || !channel || !activeWellnessPoll) return;
 
+    // Don't allow poll creators to respond to their own polls
+    if (activeWellnessPoll.created_by === user.id) {
+      toast({
+        title: "Cannot respond",
+        description: "You cannot respond to polls you created.",
+        variant: "destructive"
+      });
+      setActiveWellnessPoll(null);
+      return;
+    }
+
     setIsSending(true);
 
     try {
       const { error } = await supabase.from("poll_responses").insert({
         poll_id: pollId,
         user_id: user.id,
-        value: pollResponse,
+        response_value: pollResponse,
         comment: pollComment.trim() || null
       });
 
@@ -740,61 +837,15 @@ export default function ChannelPage() {
 
   // A helper for readability - returns the component for the current view
   const getViewComponent = () => {
+    if (!user || !channel) return null;
+
+    // Show loading placeholder during initial load
+    if (isLoading) {
+      return <div className="h-full flex items-center justify-center">Loading...</div>
+    }
+
     switch (currentView) {
-      case 'supplies':
-        return (
-          <SuppliesView
-            supplyItems={supplyItems}
-            claimedItems={claimedItems}
-            justClaimedItems={justClaimedItems}
-            userClaimedItems={userClaimedItems}
-            claimingItemIds={claimingItemIds}
-            showUserItems={showUserItems}
-            setShowUserItems={setShowUserItems}
-            claimSupplyItem={claimSupplyItem}
-            requestedItems={requestedItems}
-            user={user}
-            showRequestItemModal={showRequestItemModal}
-            setShowRequestItemModal={setShowRequestItemModal}
-            newItemTitle={newItemTitle}
-            setNewItemTitle={setNewItemTitle}
-            newItemDescription={newItemDescription}
-            setNewItemDescription={setNewItemDescription}
-            handleRequestItem={handleRequestItem}
-            isSending={isSending}
-          />
-        );
-      case 'wellness':
-        return (
-          <WellnessView
-            isAdmin={isAdmin}
-            pollResults={pollResults}
-            loadingPollResults={loadingPollResults}
-            showCreatePollForm={showCreatePollForm}
-            setShowCreatePollForm={setShowCreatePollForm}
-            newPollTitle={newPollTitle}
-            setNewPollTitle={setNewPollTitle}
-            newPollDescription={newPollDescription}
-            setNewPollDescription={setNewPollDescription}
-            minPollValue={minPollValue}
-            setMinPollValue={setMinPollValue}
-            maxPollValue={maxPollValue}
-            setMaxPollValue={setMaxPollValue}
-            createWellnessPoll={createWellnessPoll}
-            isSending={isSending}
-            activeWellnessPoll={activeWellnessPoll}
-            setActiveWellnessPoll={setActiveWellnessPoll}
-            pollResponse={pollResponse}
-            setPollResponse={setPollResponse}
-            pollComment={pollComment}
-            setPollComment={setPollComment}
-            respondToPoll={respondToPoll}
-            fetchOriginalPoll={fetchOriginalPoll}
-            user={user}
-          />
-        );
       case 'chat':
-      default:
         return (
           <ChatView
             messages={messages}
@@ -812,8 +863,184 @@ export default function ChannelPage() {
             dismissNotification={dismissNotification}
             acknowledgeMessage={acknowledgeMessage}
             isUserChannelMember={isUserChannelMember()}
+            messagesEndRef={messagesEndRef}
+            filterAdminNotifications={true}
           />
         );
+      case 'supplies':
+        return (
+          <SuppliesView 
+            supplyItems={supplyItems}
+            claimingItemIds={claimingItemIds}
+            justClaimedItems={justClaimedItems}
+            userClaimedItems={userClaimedItems}
+            showUserItems={showUserItems}
+            setShowUserItems={setShowUserItems}
+            claimSupplyItem={claimSupplyItem}
+            requestedItems={requestedItems}
+            showRequestItemModal={showRequestItemModal}
+            setShowRequestItemModal={setShowRequestItemModal}
+            newItemTitle={newItemTitle}
+            setNewItemTitle={setNewItemTitle}
+            newItemDescription={newItemDescription}
+            setNewItemDescription={setNewItemDescription}
+            handleRequestItem={handleRequestItem}
+            isSending={isSending}
+            isAdmin={isAdmin || userRole === 'admin'}
+          />
+        );
+      case 'wellness':
+        return (
+          <WellnessView
+            activeWellnessPoll={activeWellnessPoll}
+            pollResponse={pollResponse}
+            setPollResponse={setPollResponse}
+            pollComment={pollComment}
+            setPollComment={setPollComment}
+            respondToPoll={respondToPoll}
+            isAdmin={isAdmin || userRole === 'admin'}
+            newPollTitle={newPollTitle}
+            setNewPollTitle={setNewPollTitle}
+            newPollDescription={newPollDescription}
+            setNewPollDescription={setNewPollDescription}
+            showCreatePollForm={showCreatePollForm}
+            setShowCreatePollForm={setShowCreatePollForm}
+            createWellnessPoll={createWellnessPoll}
+            isSending={isSending}
+            pollResults={pollResults}
+            loadingPollResults={loadingPollResults}
+            minPollValue={minPollValue}
+            setMinPollValue={setMinPollValue}
+            maxPollValue={maxPollValue}
+            setMaxPollValue={setMaxPollValue}
+            fetchOriginalPoll={fetchOriginalPoll}
+            user={user}
+          />
+        );
+      default:
+        return <div>Select a view</div>;
+    }
+  };
+
+  // Add a new function to acknowledge alerts
+  const acknowledgeAlert = async () => {
+    if (!user || !alert) return;
+    
+    try {
+      // First, update the local state for immediate feedback
+      setAlertAcknowledged(true);
+      setShowAcknowledgePrompt(false);
+      
+      // Store in localStorage for persistence between refreshes
+      const localAcks = JSON.parse(localStorage.getItem('alertAcknowledgments') || '{}');
+      localAcks[alert.id] = true;
+      localStorage.setItem('alertAcknowledgments', JSON.stringify(localAcks));
+      
+      // Insert the acknowledgment in the database
+      const { error } = await supabase.from("alert_acknowledgments").insert({
+        alert_id: alert.id,
+        user_id: user.id,
+        acknowledged_at: new Date().toISOString()
+      });
+
+      if (error) {
+        console.error("Error acknowledging alert:", error);
+        toast({
+          title: "Error",
+          description: "Failed to acknowledge alert. Please try again.",
+          variant: "destructive",
+        });
+        
+        // Revert the optimistic update if there was an error
+        setAlertAcknowledged(false);
+        setShowAcknowledgePrompt(true);
+        
+        // Remove from localStorage
+        const localAcks = JSON.parse(localStorage.getItem('alertAcknowledgments') || '{}');
+        delete localAcks[alert.id];
+        localStorage.setItem('alertAcknowledgments', JSON.stringify(localAcks));
+      } else {
+        toast({
+          title: "Alert acknowledged",
+          description: "Your acknowledgment has been recorded.",
+        });
+      }
+    } catch (err) {
+      console.error("Error acknowledging alert:", err);
+      // Revert the optimistic update if there was an error
+      setAlertAcknowledged(false);
+      setShowAcknowledgePrompt(true);
+    }
+  };
+
+  // Add a new function to dismiss alerts
+  const dismissAlert = async (alertId: string) => {
+    if (!user || !alert) return;
+    
+    try {
+      // Insert the dismissal in the database
+      const { error } = await supabase.from("alert_dismissals").insert({
+        alert_id: alertId,
+        user_id: user.id,
+        dismissed_at: new Date().toISOString(),
+        created_at: new Date().toISOString()
+      });
+
+      if (error) {
+        console.error("Error dismissing alert:", error);
+        toast({
+          title: "Error",
+          description: "Failed to dismiss alert. Please try again.",
+          variant: "destructive",
+        });
+      } else {
+        // Navigate back to channels list
+        window.location.href = "/channels";
+        
+        toast({
+          title: "Alert dismissed",
+          description: "This alert has been dismissed.",
+        });
+      }
+    } catch (err) {
+      console.error("Error dismissing alert:", err);
+    }
+  };
+
+  // Function to dismiss admin notifications
+  const dismissAdminNotification = async (notificationId: string) => {
+    if (!user) return;
+    
+    try {
+      // First update local state for immediate feedback
+      setDismissedNotifications(prev => [...prev, notificationId]);
+      
+      console.log("Dismissing admin notification:", notificationId);
+      console.log("Updated local dismissedNotifications:", [...dismissedNotifications, notificationId]);
+      
+      // Insert the dismissal in the database
+      const { error } = await supabase.from("message_dismissals").insert({
+        message_id: notificationId,
+        user_id: user.id,
+        dismissed_at: new Date().toISOString(),
+        created_at: new Date().toISOString()
+      });
+
+      if (error) {
+        console.error("Error dismissing admin notification:", error);
+        // Revert local state if there was an error
+        setDismissedNotifications(prev => prev.filter(id => id !== notificationId));
+        
+        toast({
+          title: "Error",
+          description: "Failed to dismiss notification. Please try again.",
+          variant: "destructive",
+        });
+      }
+    } catch (err) {
+      console.error("Error dismissing admin notification:", err);
+      // Revert local state if there was an error
+      setDismissedNotifications(prev => prev.filter(id => id !== notificationId));
     }
   };
 
@@ -860,29 +1087,51 @@ export default function ChannelPage() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col">
+    <div className="flex flex-col h-screen">
       <Header />
-      <main className="flex-1 flex flex-col">
-        {/* Use the new header component */}
-        <ChannelHeader 
-          channel={channel}
-          alert={alert}
-          members={members}
-          isAdmin={isAdmin}
-          error={error}
-          inviteEmail={inviteEmail}
-          setInviteEmail={setInviteEmail}
-          handleInviteUser={handleInviteUser}
-          currentView={currentView}
-          setCurrentView={setCurrentView}
-          inviteStatus={inviteStatus}
-          inviteError={inviteError}
-        />
-
-        <div className="flex-1 flex flex-col md:flex-row">
-          {/* Render the appropriate component based on the current view */}
-          {getViewComponent()}
-        </div>
+      <main className="flex-1 flex flex-col overflow-hidden">
+        {error ? (
+          <div className="h-full flex items-center justify-center text-center p-4">
+            <div>
+              <h3 className="text-lg font-semibold text-red-600">Error</h3>
+              <p className="mt-2">{error}</p>
+              <Button
+                variant="secondary"
+                className="mt-4"
+                onClick={() => window.location.href = "/channels"}
+              >
+                Back to Channels
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <>
+            {channel && (
+              <ChannelHeader
+                channel={channel}
+                alert={alert}
+                members={members}
+                isAdmin={isAdmin || userRole === "admin"}
+                error={error}
+                inviteEmail={inviteEmail}
+                setInviteEmail={setInviteEmail}
+                handleInviteUser={handleInviteUser}
+                currentView={currentView}
+                setCurrentView={setCurrentView}
+                inviteStatus={inviteStatus}
+                inviteError={inviteError}
+                alertAcknowledged={alertAcknowledged}
+                showAcknowledgePrompt={showAcknowledgePrompt}
+                acknowledgeAlert={acknowledgeAlert}
+                dismissAlert={dismissAlert}
+                dismissAdminNotification={dismissAdminNotification}
+              />
+            )}
+            <div className="flex-1 overflow-hidden flex flex-col">
+              {getViewComponent()}
+            </div>
+          </>
+        )}
       </main>
     </div>
   );

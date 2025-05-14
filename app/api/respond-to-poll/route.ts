@@ -50,6 +50,15 @@ export async function POST(request: Request) {
       );
     }
 
+    // Check if the user is the creator of the poll
+    if (poll.created_by === userId) {
+      console.log('User is the creator of the poll and cannot respond', { pollId, userId });
+      return NextResponse.json(
+        { error: 'Poll creators cannot respond to their own polls' },
+        { status: 403 }
+      );
+    }
+
     // Verify response value is within the poll's range
     if (responseValue < poll.min_value || responseValue > poll.max_value) {
       console.log(`Response value ${responseValue} out of range (${poll.min_value}-${poll.max_value})`);

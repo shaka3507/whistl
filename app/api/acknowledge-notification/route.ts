@@ -33,11 +33,11 @@ export async function POST(request: Request) {
 
     // Insert the acknowledgment
     const { error } = await supabase
-      .from('message_acknowledgments')
+      .from('message_dismissals')
       .upsert({
         message_id: messageId,
         user_id: user.id,
-        acknowledged_at: new Date().toISOString(),
+        dismissed_at: new Date().toISOString(),
         created_at: new Date().toISOString()
       });
 

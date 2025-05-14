@@ -9,7 +9,8 @@ import {
   Activity,
   Bell,
   AlertTriangle,
-  Check
+  Check,
+  X
 } from "lucide-react";
 import {
   Dialog,
@@ -22,6 +23,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import type { Database } from "@/lib/supabase-types";
 import { timeAgo } from "./utils";
+import { supabase } from "@/lib/supabase";
 
 type Channel = Database["public"]["Tables"]["channels"]["Row"];
 type Alert = Database["public"]["Tables"]["alerts"]["Row"] & {
@@ -44,6 +46,11 @@ interface ChannelHeaderProps {
   setCurrentView: (view: 'chat' | 'supplies' | 'wellness') => void;
   inviteStatus: "idle" | "sending" | "sent";
   inviteError: string | null;
+  alertAcknowledged: boolean;
+  showAcknowledgePrompt: boolean;
+  acknowledgeAlert: () => Promise<void>;
+  dismissAlert: (alertId: string) => Promise<void>;
+  dismissAdminNotification: (notificationId: string) => Promise<void>;
 }
 
 export default function ChannelHeader({
@@ -58,9 +65,55 @@ export default function ChannelHeader({
   currentView,
   setCurrentView,
   inviteStatus,
-  inviteError
+  inviteError,
+  alertAcknowledged,
+  showAcknowledgePrompt,
+  acknowledgeAlert,
+  dismissAlert,
+  dismissAdminNotification
 }: ChannelHeaderProps) {
   const [membersDialogOpen, setMembersDialogOpen] = useState(false);
+  const [adminNotifications, setAdminNotifications] = useState<any[]>([]);
+  const [loadingNotifications, setLoadingNotifications] = useState(false);
+  const [dismissedNotificationIds, setDismissedNotificationIds] = useState<Set<string>>(new Set());
+  
+  // Fetch admin notifications
+  useEffect(() => {
+    const fetchAdminNotifications = async () => {
+      setLoadingNotifications(true);
+      try {
+        // Get only the 2 most recent admin notifications for this channel
+        const { data, error } = await supabase
+          .from("messages")
+          .select(`
+            id,
+            content,
+            created_at,
+            profiles:user_id (
+              id,
+              full_name,
+              avatar_url
+            )
+          `)
+          .eq("channel_id", channel.id)
+          .eq("is_notification", true)
+          .order("created_at", { ascending: false })
+          .limit(2);
+          
+        if (error) {
+          console.error("Error fetching admin notifications:", error);
+        } else {
+          setAdminNotifications(data || []);
+        }
+      } catch (err) {
+        console.error("Error in fetching admin notifications:", err);
+      } finally {
+        setLoadingNotifications(false);
+      }
+    };
+    
+    fetchAdminNotifications();
+  }, [channel.id]);
   
   // Add a safety mechanism to ensure invite button doesn't get stuck in sending state
   useEffect(() => {
@@ -79,9 +132,83 @@ export default function ChannelHeader({
       if (timeoutId) clearTimeout(timeoutId);
     };
   }, [inviteStatus]);
+  
+  // Handle notification dismissal
+  const handleDismissNotification = (notificationId: string) => {
+    setDismissedNotificationIds(prev => new Set([...prev, notificationId]));
+    // Call the parent function to persist to database
+    dismissAdminNotification(notificationId);
+  };
+  
+  // Filter out dismissed notifications
+  const visibleNotifications = adminNotifications.filter(
+    notification => !dismissedNotificationIds.has(notification.id)
+  );
 
   return (
     <div className="border-b w-full">
+      {/* Admin Notifications Section */}
+      {visibleNotifications.length > 0 && (
+        <div className="bg-blue-50 dark:bg-blue-900/30 px-4 py-3 relative min-h-[80px]">
+          <div className="space-y-0">
+            {visibleNotifications.map((notification, index) => {
+              // Only show the top two notifications in the staggered view
+              if (index > 1) return null;
+              
+              // First notification (index 0) is on top, second (index 1) is partially visible behind it
+              const isTopNotification = index === 0;
+              
+              return (
+                <div 
+                  key={notification.id} 
+                  className={`
+                    flex items-start justify-between text-sm
+                    bg-white dark:bg-slate-800 
+                    border border-blue-200 dark:border-blue-800 
+                    rounded-md p-3 
+                    transition-all duration-300 ease-in-out
+                    ${isTopNotification 
+                      ? 'relative z-10 shadow-md' 
+                      : `absolute top-9 left-8 right-8 z-0 opacity-85 shadow-sm
+                         transform translate-y-1 rotate-[-1deg]`
+                    }
+                  `}
+                >
+                  <div className="flex items-start gap-2 max-w-[calc(100%-36px)]">
+                    <Bell className="h-4 w-4 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
+                    <div className="overflow-hidden">
+                      <div className="font-medium text-blue-800 dark:text-blue-300 truncate">
+                        {notification.profiles.full_name}
+                      </div>
+                      <div className="line-clamp-2">{notification.content}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {timeAgo(notification.created_at)}
+                      </div>
+                    </div>
+                  </div>
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={() => handleDismissNotification(notification.id)}
+                    className="h-6 w-6 p-0 rounded-full flex-shrink-0"
+                  >
+                    <span className="sr-only">Dismiss</span>
+                    <X className="h-3 w-3" />
+                  </Button>
+                </div>
+              );
+            })}
+          </div>
+          
+          {/* Add count indicator if there are more than 2 notifications */}
+          {visibleNotifications.length > 2 && (
+            <div className="absolute bottom-2 right-4 text-xs font-medium text-blue-600 dark:text-blue-400">
+              +{visibleNotifications.length - 2} more
+            </div>
+          )}
+        </div>
+      )}
+      
       <div className="flex items-center justify-between h-14 px-2 sm:px-4 max-w-full overflow-hidden">
         <div className="flex items-center gap-2 min-w-0">
           <h1 className="font-semibold text-base sm:text-lg truncate max-w-[120px] sm:max-w-none">{channel.name}</h1>
@@ -248,18 +375,41 @@ export default function ChannelHeader({
                     {alert.title}
                   </DialogTitle>
                   <DialogDescription>
-                    {timeAgo(alert.created_at)}
+                    {alert.description}
+                    <div className="text-xs text-gray-500 mt-1">
+                      Issued {timeAgo(alert.created_at)}
+                    </div>
                   </DialogDescription>
                 </DialogHeader>
-                <div className="mt-4">
-                  <div className="font-medium mb-2">Description:</div>
-                  <p className="text-sm">{alert.description}</p>
-                </div>
-                <div className="mt-4">
-                  <div className="font-medium mb-2">Severity:</div>
-                  <div className="inline-block px-2 py-1 rounded-full text-xs font-medium capitalize bg-red-100 text-red-800">
-                    {alert.severity}
-                  </div>
+                
+                <div className="mt-4 border-t pt-4 flex flex-col gap-3">
+                  {/* Only show acknowledge button if acknowledgment is required and not already acknowledged */}
+                  {alert.requires_acknowledgment && (
+                    <div>
+                      {alertAcknowledged ? (
+                        <div className="flex items-center text-green-600 gap-2">
+                          <Check className="h-5 w-5" />
+                          <span>You have acknowledged this alert</span>
+                        </div>
+                      ) : (
+                        <Button 
+                          onClick={acknowledgeAlert}
+                          className="w-full"
+                        >
+                          Acknowledge Alert
+                        </Button>
+                      )}
+                    </div>
+                  )}
+                  
+                  {/* Add Dismiss button */}
+                  <Button 
+                    variant="outline"
+                    onClick={() => dismissAlert(alert.id)}
+                    className="w-full"
+                  >
+                    Dismiss Alert
+                  </Button>
                 </div>
               </DialogContent>
             </Dialog>

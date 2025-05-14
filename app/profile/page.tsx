@@ -30,9 +30,6 @@ export default function ProfilePage() {
   const [safeSpaceAddress, setSafeSpaceAddress] = useState("");
   const [emailNotifications, setEmailNotifications] = useState(false);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
-  const [usernameError, setUsernameError] = useState("");
-  const [isCheckingUsername, setIsCheckingUsername] = useState(false);
-  const [originalUsername, setOriginalUsername] = useState("");
 
   // Force a fresh profile fetch when the page loads
   useEffect(() => {
@@ -55,7 +52,6 @@ export default function ProfilePage() {
           if (data) {
             setFullName(data.full_name || "");
             setUsername(data.username || "");
-            setOriginalUsername(data.username || "");
             setAvatarUrl(data.avatar_url || "");
             setNotes(data.notes || "");
             setEmailNotifications(data.email_notifications || false);
@@ -81,64 +77,11 @@ export default function ProfilePage() {
     if (profile) {
       setFullName(profile.full_name || "");
       setUsername(profile.username || "");
-      setOriginalUsername(profile.username || "");
       setAvatarUrl(profile.avatar_url || "");
       setEmailNotifications(profile.email_notifications || false);
     }
     setIsCheckingAuth(false);
   }, [user, profile, router]);
-
-  // Check if username is available
-  const checkUsernameAvailability = async (newUsername: string) => {
-    // Don't check if username hasn't changed from original
-    if (newUsername === originalUsername) {
-      setUsernameError("");
-      return true;
-    }
-    
-    // Don't check empty usernames
-    if (!newUsername.trim()) {
-      setUsernameError("");
-      return true;
-    }
-    
-    setIsCheckingUsername(true);
-    try {
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("username")
-        .eq("username", newUsername)
-        .not("id", "eq", user?.id || "")
-        .maybeSingle();
-      
-      if (error) throw error;
-      
-      const isAvailable = !data;
-      if (!isAvailable) {
-        setUsernameError("This username is already taken");
-        return false;
-      } else {
-        setUsernameError("");
-        return true;
-      }
-    } catch (error) {
-      console.error("Error checking username:", error);
-      return true; // Allow submission if check fails
-    } finally {
-      setIsCheckingUsername(false);
-    }
-  };
-  
-  // Debounced username check
-  useEffect(() => {
-    const timeoutId = setTimeout(() => {
-      if (username) {
-        checkUsernameAvailability(username);
-      }
-    }, 500);
-    
-    return () => clearTimeout(timeoutId);
-  }, [username]);
 
   if (isCheckingAuth) {
     return <div className="flex items-center justify-center h-screen">Loading...</div>;
@@ -172,20 +115,18 @@ export default function ProfilePage() {
 
       if (updateError) throw updateError;
 
+      // Clear user cache after avatar update
+      clearUserCache();
+      
+      // Fetch fresh profile data to update UI without refresh
+      await fetchFreshProfileData();
+
       toast({
         title: "Success",
-        description: "Your avatar has been updated. Refresh to see all changes.",
+        description: "Your avatar has been updated successfully.",
         variant: "success",
-        action: (
-          <Button 
-            onClick={() => window.location.reload()} 
-            variant="outline" 
-            className="bg-white hover:bg-gray-100"
-          >
-            Refresh
-          </Button>
-        ),
       });
+      
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : "An unexpected error occurred";
       toast({
@@ -201,41 +142,78 @@ export default function ProfilePage() {
   // Add a direct Supabase update function as a fallback
   const directProfileUpdate = async (updates: any) => {
     if (!user?.id) {
+      console.error("No user ID for profile update");
       throw new Error("User ID is required for profile update");
     }
     
-    const { data, error } = await supabase
-      .from("profiles")
-      .update({ ...updates, updated_at: new Date().toISOString() })
-      .eq("id", user.id);
+    console.log(`Attempting direct profile update via Supabase for user ${user.id}`, updates);
+    
+    try {
+      const { data, error } = await supabase
+        .from("profiles")
+        .update({ ...updates, updated_at: new Date().toISOString() })
+        .eq("id", user.id)
+        .select();
       
-    return { data, error };
+      if (error) {
+        console.error("Direct update failed:", error);
+        throw error;
+      }
+      
+      console.log("Direct update succeeded, response:", data);
+      return { data, error };
+    } catch (err) {
+      console.error("Exception in direct profile update:", err);
+      return { data: null, error: err as Error };
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    console.log("Form submitted, starting profile update process");
     
-    // Validate username first
-    if (username !== originalUsername) {
-      const isUsernameAvailable = await checkUsernameAvailability(username);
-      if (!isUsernameAvailable) {
-        toast({
-          title: "Error",
-          description: "Username is already taken. Please choose a different username.",
-          variant: "destructive",
-        });
-        return;
-      }
+    // Set loading state immediately to show Saving... on button
+    setIsLoading(true);
+    
+    // Trim input values to remove leading/trailing spaces
+    const trimmedFullName = fullName.trim();
+    const trimmedUsername = username.trim();
+    
+    // Debug values being submitted
+    console.log("Submitting values:", {
+      fullName: trimmedFullName,
+      username: trimmedUsername,
+      notes: notes.trim(),
+      emailNotifications
+    });
+    
+    // Validate required fields
+    if (!trimmedFullName) {
+      toast({
+        title: "Error",
+        description: "Full name is required",
+        variant: "destructive",
+      });
+      setIsLoading(false);
+      return;
     }
     
-    setIsLoading(true);
-
+    if (!trimmedUsername) {
+      toast({
+        title: "Error",
+        description: "Username is required",
+        variant: "destructive",
+      });
+      setIsLoading(false);
+      return;
+    }
+    
     try {
       // Only include email_notifications if it exists in the profile schema
       const updates = {
-        full_name: fullName,
-        username,
-        notes,
+        full_name: trimmedFullName,
+        username: trimmedUsername,
+        notes: notes.trim(),
       };
       
       // Check if email_notifications exists in the profile before including it
@@ -245,117 +223,72 @@ export default function ProfilePage() {
 
       console.log("Attempting to update profile with:", updates);
       
-      // Implement retry logic for network issues
-      let retryCount = 0;
-      const maxRetries = 3;
-      let success = false;
-      let lastError = null;
-      let usedFallback = false;
+      // Update the form state immediately with trimmed values for better UX
+      setFullName(trimmedFullName);
+      setUsername(trimmedUsername);
       
-      while (retryCount < maxRetries && !success) {
-        try {
-          // After first failure, try direct Supabase update instead
-          if (retryCount >= 1) {
-            console.log("Trying fallback direct Supabase update...");
-            const { error } = await directProfileUpdate(updates);
-            usedFallback = true;
-            
-            if (error) {
-              console.error(`Direct profile update attempt ${retryCount + 1} error:`, error);
-              lastError = error;
-              retryCount++;
-            } else {
-              success = true;
-            }
-          } else {
-            // First try with context function
-            const { error } = await updateProfile(updates);
-            
-            if (error) {
-              console.error(`Profile update attempt ${retryCount + 1} error:`, error);
-              lastError = error;
-              retryCount++;
-            } else {
-              success = true;
-            }
-          }
-          
-          // If not successful and we should retry
-          if (!success && retryCount < maxRetries) {
-            const delay = Math.pow(2, retryCount) * 500; // 500ms, 1s, 2s
-            await new Promise(resolve => setTimeout(resolve, delay));
-            console.log(`Retrying profile update (${retryCount}/${maxRetries}) after ${delay}ms delay...`);
-          }
-        } catch (err) {
-          console.error(`Profile update attempt ${retryCount + 1} exception:`, err);
-          lastError = err;
-          retryCount++;
-          
-          // Wait before retrying
-          if (retryCount < maxRetries) {
-            const delay = Math.pow(2, retryCount) * 500;
-            await new Promise(resolve => setTimeout(resolve, delay));
-            console.log(`Retrying profile update (${retryCount}/${maxRetries}) after ${delay}ms delay...`);
-          }
+      // Simple update for prototype - just try once and handle errors generically
+      try {
+        const { error } = await updateProfile(updates);
+        
+        if (error) {
+          console.error("Profile update error:", error);
+          // For prototype, just show a generic error
+          throw error;
         }
+        
+        // Clear application cache
+        clearUserCache();
+        
+        // Fetch fresh profile data
+        await fetchFreshProfileData();
+        
+        toast({
+          title: "Success",
+          description: "Your profile has been updated successfully.",
+          variant: "success",
+        });
+      } catch (error) {
+        console.error("Profile update failed:", error);
+        // For a prototype, handle all errors with a generic message
+        toast({
+          title: "Error",
+          description: "Failed to update profile. Please try again.",
+          variant: "destructive",
+        });
       }
       
-      if (!success) {
-        throw lastError || new Error("Failed to update profile after multiple attempts");
-      }
-
-      // If we used the fallback, reload the page to ensure we get fresh data
-      const refreshNeeded = usedFallback;
-
-      toast({
-        title: "Success",
-        description: "Your profile has been updated. Refresh to see all changes.",
-        variant: "success",
-        action: (
-          <Button 
-            onClick={() => window.location.reload()} 
-            variant="outline" 
-            className="bg-white hover:bg-gray-100"
-          >
-            Refresh
-          </Button>
-        ),
-      });
-      
-      // If we used the fallback method, automatically refresh after a short delay
-      if (refreshNeeded) {
-        setTimeout(() => window.location.reload(), 1500);
-      }
     } catch (error: unknown) {
-      console.error("Full error object:", error);
-      let errorMessage = "An unexpected error occurred";
-      
-      if (error instanceof Error) {
-        errorMessage = error.message;
-      }
-      
-      // Check for network errors
-      if (typeof error === 'object' && error !== null) {
-        if ('message' in error && (error as any).message?.includes('fetch')) {
-          errorMessage = "Network connection issue. Please check your internet connection and try again.";
-        }
-      }
-      
-      // Check for Supabase PostgrestError with status 409
-      if (typeof error === 'object' && error !== null && 'code' in error) {
-        const pgError = error as any;
-        if (pgError.code === '409' || pgError.status === 409) {
-          errorMessage = "Username is already taken. Please choose a different username.";
-        }
-      }
-      
+      console.error("Error in profile update:", error);
       toast({
         title: "Error",
-        description: errorMessage,
+        description: "An error occurred while updating your profile.",
         variant: "destructive",
       });
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  // Function to clear user cache in application
+  const clearUserCache = () => {
+    console.log("Clearing user cache...");
+    try {
+      // Clear any profile-related cache from localStorage
+      const cacheKeys = Object.keys(localStorage).filter(key => 
+        key.includes('profile') || 
+        key.includes('whistl-profile') || 
+        key.includes('user')
+      );
+      
+      cacheKeys.forEach(key => {
+        console.log(`Removing cache key: ${key}`);
+        localStorage.removeItem(key);
+      });
+      
+      console.log("User cache cleared successfully");
+    } catch (err) {
+      console.error("Error clearing user cache:", err);
     }
   };
 
@@ -366,6 +299,44 @@ export default function ProfilePage() {
 
     const file = e.target.files[0];
     setImportantDocuments(file);
+  };
+
+  // Function to fetch fresh profile data from the server
+  const fetchFreshProfileData = async () => {
+    console.log("Fetching fresh profile data from server");
+    try {
+      if (!user?.id) {
+        console.error("No user ID for profile fetch");
+        return;
+      }
+      
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", user.id)
+        .single();
+        
+      if (error) {
+        console.error("Error fetching fresh profile data:", error);
+        return;
+      }
+      
+      if (data) {
+        console.log("Fresh profile data received:", data);
+        // Update all local state
+        setFullName(data.full_name || "");
+        setUsername(data.username || "");
+        setAvatarUrl(data.avatar_url || "");
+        if (data.notes !== undefined) {
+          setNotes(data.notes || "");
+        }
+        if ('email_notifications' in data) {
+          setEmailNotifications(data.email_notifications || false);
+        }
+      }
+    } catch (err) {
+      console.error("Error in fetchFreshProfileData:", err);
+    }
   };
 
   if (!user) {
@@ -440,10 +411,7 @@ export default function ProfilePage() {
                     type="text"
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
-                    className={usernameError ? "border-red-500" : ""}
                   />
-                  {isCheckingUsername && <p className="text-sm text-muted-foreground">Checking username...</p>}
-                  {usernameError && <p className="text-sm text-red-500">{usernameError}</p>}
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="notes">Notes</Label>
@@ -497,12 +465,25 @@ export default function ProfilePage() {
                     onChange={(e) => setSafeSpaceAddress(e.target.value)}
                   />
                 </div>
-                <Button type="submit" className="w-full" disabled={isLoading}>
+                <Button 
+                  type="submit" 
+                  className="w-full" 
+                  disabled={isLoading}
+                  onClick={(e) => {
+                    console.log("Save button clicked");
+                    if (!isLoading) {
+                      // Set loading state immediately for instant visual feedback
+                      setIsLoading(true);
+                      // This is a redundant handler in case the form submit doesn't trigger
+                      handleSubmit(e as unknown as React.FormEvent);
+                    }
+                  }}
+                >
                   {isLoading ? (
-                    <>
+                    <div className="flex items-center justify-center">
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Saving...
-                    </>
+                      <span>Saving...</span>
+                    </div>
                   ) : (
                     "Save changes"
                   )}

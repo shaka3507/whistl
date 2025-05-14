@@ -80,7 +80,7 @@ export default function SuppliesView({
   
   // Helper function to get remaining quantity
   const getRemainingQuantity = (item: AlertPreparationItem) => {
-    const claimed = claimedItems[item.id] || 0;
+    const claimed = claimedItems && claimedItems[item.id] ? claimedItems[item.id] : 0;
     return item.quantity - claimed;
   };
 

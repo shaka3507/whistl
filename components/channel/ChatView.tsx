@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Send, MessageSquare, CheckCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -47,6 +47,7 @@ interface ChatViewProps {
   dismissNotification: (id: string) => Promise<void>;
   acknowledgeMessage: (id: string) => Promise<void>;
   isUserChannelMember: boolean;
+  filterAdminNotifications?: boolean;
 }
 
 export default function ChatView({
@@ -64,14 +65,36 @@ export default function ChatView({
   dismissedNotifications,
   dismissNotification,
   acknowledgeMessage,
-  isUserChannelMember
+  isUserChannelMember,
+  filterAdminNotifications = true,
 }: ChatViewProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  // Modified: Keep all messages regardless of notification status
+  const filteredMessages = filterAdminNotifications
+    ? messages.filter(message => 
+        // Only filter out dismissed messages
+        !dismissedNotifications.includes(message.id)
+      )
+    : messages;
+    
+  // Auto-scroll to bottom of messages when new messages arrive
+  useEffect(() => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [filteredMessages.length]);
+
+  // Debug logging for dismissed notifications
+  useEffect(() => {
+    console.log("Dismissed notification IDs:", dismissedNotifications);
+  }, [dismissedNotifications]);
+
   return (
-    <div className="flex-1 flex flex-col">
+    <div className="flex flex-col h-full">
+      {/* Make the messages container take all available space and be scrollable */}
       <div className="flex-1 overflow-y-auto p-4">
-        {messages.length === 0 ? (
+        {filteredMessages.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-center p-4">
             <MessageSquare className="h-12 w-12 text-muted-foreground mb-4" />
             <h3 className="text-lg font-medium">No messages yet</h3>
@@ -81,9 +104,7 @@ export default function ChatView({
           </div>
         ) : (
           <div className="space-y-6">
-            {messages.map((message) => {
-              const isNotification = message.is_notification;
-              const isPushNotification = message.notification_type === 'push';
+            {filteredMessages.map((message) => {
               const initials = message.profiles.full_name
                 ? message.profiles.full_name
                     .split(" ")
@@ -91,126 +112,8 @@ export default function ChatView({
                     .join("")
                 : "U";
 
-              if (
-                isNotification &&
-                isPushNotification &&
-                !dismissedNotifications.includes(message.id)
-              ) {
-                return (
-                  <div
-                    key={message.id}
-                    className="fixed inset-0 flex items-center justify-center z-50 bg-black/50 backdrop-blur-sm animate-in fade-in"
-                  >
-                    <div className="bg-background border rounded-lg p-6 pt-14 mx-4 my-auto max-w-md shadow-lg w-full transform transition-all scale-in-center relative">
-                      <div className="absolute -top-8 left-1/2 transform -translate-x-1/2">
-                        <div className="p-4 rounded-full bg-red-100 border-4 border-white shadow-md">
-                          <Bell className="h-12 w-12 text-red-600" />
-                        </div>
-                      </div>
-                      
-                      <div className="text-center mb-4">
-                        <h3 className="text-lg font-semibold mt-4">Alert</h3>
-                        <div className="text-xs text-muted-foreground">
-                          <ClientOnly>
-                            {timeAgo(message.created_at)}
-                          </ClientOnly>
-                        </div>
-                      </div>
-                      
-                      <div className="mt-3">
-                        <div className="flex items-start gap-3">
-                          <div>
-                            <p className="text-sm mt-1">{message.content}</p>
-                          </div>
-                        </div>
-                      </div>
-                      
-                      <div className="flex items-center justify-center mt-4 pt-2 border-t">
-                        {message.isAcknowledged ? (
-                          <div className="flex items-center text-green-600 gap-2">
-                            <CheckCircle className="h-5 w-5" />
-                            <span>Acknowledged</span>
-                          </div>
-                        ) : (
-                          <Button
-                            size="lg"
-                            onClick={() => {
-                              acknowledgeMessage(message.id);
-                              dismissNotification(message.id);
-                            }}
-                            className="rounded-full px-6"
-                          >
-                            Acknowledge
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                );
-              }
-              
-              // Display standard notifications inline
-              if (isNotification && !isPushNotification && !dismissedNotifications.includes(message.id)) {
-                return (
-                  <div key={message.id} className="flex items-start gap-3 bg-slate-50 dark:bg-slate-900 p-3 rounded-md border border-slate-200 dark:border-slate-800 mb-4">
-                    <div className="h-8 w-8 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center flex-shrink-0">
-                      <Bell className="h-4 w-4 text-red-600 dark:text-red-400" />
-                    </div>
-                    <div className="flex-1">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center">
-                          <div className="font-medium text-sm">
-                            Alert
-                          </div>
-                          <div className="text-xs text-muted-foreground ml-2">
-                            <ClientOnly>
-                              {timeAgo(message.created_at)}
-                            </ClientOnly>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          {message.requires_acknowledgment && (
-                            <div className="flex items-center">
-                              {message.isAcknowledged ? (
-                                <div className="flex items-center text-green-600 gap-1 text-xs">
-                                  <CheckCircle className="h-3 w-3" />
-                                  <span>Acknowledged</span>
-                                </div>
-                              ) : (
-                                <Button 
-                                  variant="outline" 
-                                  size="sm" 
-                                  onClick={() => acknowledgeMessage(message.id)}
-                                  className="h-6 px-3 rounded-full text-xs"
-                                >
-                                  Acknowledge
-                                </Button>
-                              )}
-                            </div>
-                          )}
-                          <Button 
-                            variant="ghost" 
-                            size="sm" 
-                            onClick={() => dismissNotification(message.id)}
-                            className="h-6 px-3 rounded-full text-xs"
-                          >
-                            Dismiss
-                          </Button>
-                        </div>
-                      </div>
-                      <div className="mt-1 flex items-start gap-2">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-1 mb-0.5">
-                            <span className="text-xs text-muted-foreground">From:</span>
-                            <span className="text-xs font-medium">{message.profiles.full_name}</span>
-                          </div>
-                          <p className="text-sm">{message.content}</p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                );
-              }
+              // Display acknowledgment buttons for messages that require it
+              const needsAcknowledgment = message.requires_acknowledgment && !message.isAcknowledged;
 
               const hasImage =
                 message.content.includes("[Image]") &&
@@ -238,15 +141,42 @@ export default function ChatView({
                     <AvatarFallback>{initials}</AvatarFallback>
                   </Avatar>
                   <div className="flex-1">
-                    <div className="flex items-center gap-2">
-                      <div className="font-medium">
-                        {message.profiles.full_name}
+                    <div className="flex items-center gap-2 justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="font-medium">
+                          {message.profiles.full_name}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          <ClientOnly>
+                            {timeAgo(message.created_at)}
+                          </ClientOnly>
+                        </div>
                       </div>
-                      <div className="text-xs text-muted-foreground">
-                        <ClientOnly>
-                          {timeAgo(message.created_at)}
-                        </ClientOnly>
-                      </div>
+                      
+                      {/* Add buttons for acknowledgment and dismissal if needed */}
+                      {(message.requires_acknowledgment || message.is_notification) && (
+                        <div className="flex items-center gap-2">
+                          {message.requires_acknowledgment && (
+                            <div className="flex items-center">
+                              {message.isAcknowledged ? (
+                                <div className="flex items-center text-green-600 gap-1 text-xs">
+                                  <CheckCircle className="h-3 w-3" />
+                                  <span>Acknowledged</span>
+                                </div>
+                              ) : (
+                                <Button 
+                                  variant="outline" 
+                                  size="sm" 
+                                  onClick={() => acknowledgeMessage(message.id)}
+                                  className="h-6 px-3 rounded-full text-xs"
+                                >
+                                  Acknowledge
+                                </Button>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                     <div className="mt-1">
                       {hasImage ? (
@@ -268,11 +198,13 @@ export default function ChatView({
                 </div>
               );
             })}
-            <div ref={messagesEndRef} />
+            <div ref={messagesEndRef} className="h-px" />
           </div>
         )}
       </div>
-      <div className="border-t p-4">
+      
+      {/* Make the chat input fixed at the bottom and ensure it doesn't scroll with content */}
+      <div className="border-t p-4 bg-background flex-shrink-0">
         {isAdmin ? (
           <Tabs defaultValue="message" className="mb-4">
             <TabsList>
@@ -286,8 +218,12 @@ export default function ChatView({
                   value={newMessage}
                   onChange={(e) => setNewMessage(e.target.value)}
                   disabled={isSending}
+                  className="min-h-10" // Ensure consistent height
                 />
-                <Button type="submit" disabled={isSending || !newMessage.trim()}>
+                <Button
+                  type="submit"
+                  disabled={isSending || !newMessage.trim()}
+                >
                   <Send className="h-4 w-4" />
                 </Button>
               </form>
@@ -336,6 +272,7 @@ export default function ChatView({
               value={newMessage}
               onChange={(e) => setNewMessage(e.target.value)}
               disabled={isSending}
+              className="min-h-10" // Ensure consistent height
             />
             <Button
               type="submit"
