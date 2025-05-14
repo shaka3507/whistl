@@ -259,6 +259,36 @@ export default function ChannelPage() {
           } else {
             setSupplyItems(supplyItemsData || []);
           }
+          
+          // Fetch claimed supply items to determine what's already claimed
+          const { data: claimedItemsData, error: claimedItemsError } = await supabase
+            .from("claimed_supply_items")
+            .select("*")
+            .eq("alert_id", alertData.id);
+            
+          if (claimedItemsError) {
+            console.error("Error fetching claimed items:", claimedItemsError);
+          } else if (claimedItemsData) {
+            // Create a map to count claimed quantities for each item
+            const claimedItemsMap: Record<string, number> = {};
+            
+            // Track which items this user has claimed
+            const userClaimed = new Set<string>();
+            
+            claimedItemsData.forEach(claim => {
+              // Count total claimed quantities
+              const itemId = claim.item_id;
+              claimedItemsMap[itemId] = (claimedItemsMap[itemId] || 0) + claim.claimed_quantity;
+              
+              // Mark items claimed by the current user
+              if (claim.user_id === user.id) {
+                userClaimed.add(itemId);
+              }
+            });
+            
+            setClaimedItems(claimedItemsMap);
+            setUserClaimedItems(userClaimed);
+          }
         }
 
         // Fetch requested items
@@ -663,22 +693,60 @@ export default function ChannelPage() {
 
   // Function to claim supply items
   const claimSupplyItem = async (itemId: string) => {
-    if (!user || !channel) return;
+    if (!user || !channel || !alert) return;
     
     try {
       setClaimingItemIds(prev => new Set([...prev, itemId]));
       
-      const { error } = await supabase.from("claimed_items").insert({
-        item_id: itemId,
-        user_id: user.id,
-        channel_id: channel.id
-      });
-
-      if (error) {
-        if (error.code === '23505') { // Unique constraint violation - user already claimed
+      // First, check if this item is already claimed
+      const { data: existingClaim, error: checkError } = await supabase
+        .from("claimed_supply_items")
+        .select("*")
+        .eq("item_id", itemId)
+        .single();
+      
+      if (checkError && checkError.code !== 'PGRST116') { // PGRST116 is "not found"
+        throw checkError;
+      }
+      
+      if (existingClaim) {
+        // Item already claimed - could be by this user or another user
+        if (existingClaim.user_id === user.id) {
           toast({
             title: "Already claimed",
             description: "You've already claimed this item",
+            variant: "destructive"
+          });
+        } else {
+          toast({
+            title: "Item unavailable",
+            description: "This item has already been claimed by someone else",
+            variant: "destructive"
+          });
+        }
+        return;
+      }
+      
+      // Find the item to get its quantity
+      const item = supplyItems.find(i => i.id === itemId);
+      if (!item) {
+        throw new Error("Item not found");
+      }
+      
+      // Use RLS policies to ensure only one user can claim successfully
+      const { error } = await supabase.from("claimed_supply_items").insert({
+        item_id: itemId,
+        user_id: user.id,
+        alert_id: alert.id,
+        claimed_quantity: 1, // Default to 1, or use a dynamic quantity if your UI allows it
+        claimed_at: new Date().toISOString()
+      });
+
+      if (error) {
+        if (error.code === '23505') { // Unique constraint violation - user already claimed or race condition
+          toast({
+            title: "Already claimed",
+            description: "This item has just been claimed",
             variant: "destructive"
           });
         } else {
@@ -693,6 +761,22 @@ export default function ChannelPage() {
           title: "Item claimed",
           description: "You've claimed this item"
         });
+        
+        // Refresh data to ensure UI is in sync with the database
+        fetchMessages();
+        
+        // Re-fetch supply items
+        if (alert) {
+          const { data: supplyItemsData, error: supplyItemsError } = await supabase
+            .from("alert_preparation_items")
+            .select("*")
+            .eq("alert_id", alert.id)
+            .order("name");
+            
+          if (!supplyItemsError && supplyItemsData) {
+            setSupplyItems(supplyItemsData);
+          }
+        }
       }
     } catch (err: any) {
       console.error("Error claiming item:", err);

@@ -59,6 +59,30 @@ export default function ChannelsPage() {
         // Extract channels from the response
         const userChannels = data.map((member) => member.channel);
         setChannels(userChannels || []);
+        
+        // After setting channels, check which items are claimed
+        if (userChannels && userChannels.length > 0) {
+          // Get all alert IDs from all channels
+          const alertIds = userChannels.flatMap(channel => 
+            channel.alerts ? channel.alerts.map(alert => alert.id) : []
+          );
+          
+          if (alertIds.length > 0) {
+            // Fetch claimed supply items for these alerts
+            const { data: claimedData, error: claimedError } = await supabase
+              .from("claimed_supply_items")
+              .select("*")
+              .in("alert_id", alertIds);
+              
+            if (claimedError) {
+              console.error("Error fetching claimed items:", claimedError);
+            } else if (claimedData && claimedData.length > 0) {
+              // Process the claimed items
+              // For now we just log them - we could update the UI based on this data
+              console.log("Claimed items found:", claimedData.length);
+            }
+          }
+        }
       } catch (err: any) {
         console.error("Error fetching channels:", err);
         setError(err.message || "Failed to load channels");
@@ -80,54 +104,72 @@ export default function ChannelsPage() {
       // Set the loading state for this item
       setClaimingItems(prev => new Set([...prev, itemId]))
       
-      // Use a conditional update that only succeeds if claimed_by is currently null
-      const { error, data } = await supabase
-        .from("alert_items")
-        .update({ claimed_by: user.id })
-        .eq("id", itemId)
-        .eq("alert_id", alertId)
-        .eq("channel_id", channelId)
-        .is("claimed_by", null) // Only update if claimed_by is null
-        .select()
-
-      if (error) throw error
+      // First check if the item is already claimed in the claimed_supply_items table
+      const { data: existingClaim, error: checkError } = await supabase
+        .from("claimed_supply_items")
+        .select("*")
+        .eq("item_id", itemId)
+        .single();
       
-      // Check if the update was successful by seeing if any rows were affected
-      if (!data || data.length === 0) {
-        // Item was already claimed by someone else
-        console.log("Item already claimed by another user")
-        // You could add user feedback here (like a toast notification)
+      if (checkError && checkError.code !== 'PGRST116') { // PGRST116 is "not found"
+        throw checkError;
+      }
+      
+      if (existingClaim) {
+        // Item already claimed
+        console.log("Item already claimed")
+        
+        // Provide user feedback through a notification or alert
+        // (You would likely want to add a toast component here)
+        
         return
       }
+      
+      // Insert into claimed_supply_items table with a unique constraint
+      const { error } = await supabase
+        .from("claimed_supply_items")
+        .insert({
+          item_id: itemId,
+          user_id: user.id,
+          alert_id: alertId,
+          claimed_quantity: 1, // Default to 1, or use a dynamic quantity if your UI allows it
+          claimed_at: new Date().toISOString()
+        });
 
-      // Refresh the channels data
-      const { data: updatedChannels, error: channelError } = await supabase
-        .from("channels")
-        .select(`
-          id,
-          name,
-          description,
-          alerts (
-            id,
-            title,
-            description,
-            severity,
-            status,
-            items (
-              id,
-              name,
-              quantity,
-              claimed_by
-            )
-          )
-        `)
-        .in(
-          "id",
-          channels.map((c) => c.id)
-        )
+      if (error) {
+        if (error.code === '23505') { // Unique constraint violation
+          console.log("Item was claimed by someone else just now")
+          // Add user feedback (toast notification)
+          return
+        }
+        throw error
+      }
+      
+      // Just refetch the channels directly using the same method as the initial load
+      const fetchUpdatedChannels = async () => {
+        try {
+          // Fetch channels the user is a member of
+          const { data, error } = await supabase
+            .from("channel_members")
+            .select(`
+              channel:channels(*)
+            `)
+            .eq("user_id", user.id);
 
-      if (channelError) throw channelError
-      setChannels(updatedChannels || [])
+          if (error) {
+            throw error;
+          }
+
+          // Extract channels from the response
+          const userChannels = data.map((member) => member.channel);
+          setChannels(userChannels || []);
+        } catch (err: any) {
+          console.error("Error refreshing channels:", err);
+        }
+      };
+
+      // Refresh the channels
+      await fetchUpdatedChannels();
     } catch (error) {
       console.error("Error claiming item:", error)
     } finally {
