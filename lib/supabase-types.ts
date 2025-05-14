@@ -192,6 +192,7 @@ export interface Database {
           updated_at: string
           phone_number: string | null
           email_notifications: boolean
+          is_admin: boolean
         }
         Insert: {
           id: string
@@ -201,6 +202,7 @@ export interface Database {
           updated_at?: string
           phone_number?: string | null
           email_notifications?: boolean
+          is_admin?: boolean
         }
         Update: {
           id?: string
@@ -210,6 +212,7 @@ export interface Database {
           updated_at?: string
           phone_number?: string | null
           email_notifications?: boolean
+          is_admin?: boolean
         }
       }
       invitations: {

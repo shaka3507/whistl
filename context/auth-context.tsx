@@ -24,7 +24,7 @@ interface AuthContextType {
   isLoading: boolean;
   isAdmin: boolean;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
-  signUp: (email: string, password: string, fullName: string) => Promise<{ error: Error | null }>;
+  signUp: (email: string, password: string, fullName: string, isAdmin: boolean) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
   updateProfile: (updates: Partial<Profile>) => Promise<{ error: Error | null }>;
 }
@@ -220,28 +220,58 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       // Fetch profile with retry
       const fetchProfileFn = async () => {
+        console.log("Fetching fresh profile data for user:", userId);
         const { data, error } = await supabase
           .from("profiles")
           .select("*")
           .eq("id", userId)
           .single();
 
-        if (error) throw error;
+        if (error) {
+          console.error("Error fetching profile:", error);
+          throw error;
+        }
+        
+        console.log("Profile data retrieved:", data);
         return data;
       };
 
-      const data = await fetchWithRetry(fetchProfileFn);
+      let attempts = 0;
+      const maxAttempts = 3;
+      let profile = null;
+      
+      // If profile fetch fails initially (e.g., right after signup),
+      // retry a few times with increasing delays
+      while (attempts < maxAttempts && !profile) {
+        try {
+          profile = await fetchProfileFn();
+          break;
+        } catch (error) {
+          attempts++;
+          if (attempts >= maxAttempts) throw error;
+          
+          // Wait before retrying (escalating wait time)
+          const waitTime = attempts * 1000;
+          console.log(`Profile fetch attempt ${attempts} failed, retrying in ${waitTime}ms`);
+          await new Promise(resolve => setTimeout(resolve, waitTime));
+        }
+      }
       
       // Cache the profile and update state
-      setCachedData(`${PROFILE_CACHE_KEY}:${userId}`, data);
-      setProfile(data);
-      setIsAdmin(!!data.is_admin);
-      return data;
+      if (profile) {
+        setCachedData(`${PROFILE_CACHE_KEY}:${userId}`, profile);
+        setProfile(profile);
+        setIsAdmin(!!profile.is_admin);
+        console.log("Admin status set to:", !!profile.is_admin);
+        return profile;
+      }
+      
+      return null;
     } catch (err) {
       console.error("Profile fetch error:", err);
       return null;
     }
-  }, [getCachedData, setCachedData, fetchWithRetry]);
+  }, [getCachedData, setCachedData]);
 
   const initializeAuth = useCallback(async () => {
     const now = Date.now();
@@ -599,106 +629,123 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [setCachedData]);
 
-  const signUp = useCallback(async (email: string, password: string, fullName: string) => {
-    // Prevent multiple sign-up attempts while one is in progress
+  const signUp = useCallback(async (email: string, password: string, fullName: string, isAdmin: boolean = false) => {
+    console.log(`Attempting to sign up user: ${email}, isAdmin: ${isAdmin}`);
+    
+    // Prevent multiple sign-up attempts
     if (isRedirecting.current) {
       console.log('Sign-up already in progress, ignoring duplicate request');
       return { error: null };
     }
     
-    let retries = 0;
-    const maxRetries = 3;
-    const initialBackoff = 1000;
-    let backoff = initialBackoff;
-    
     try {
       isRedirecting.current = true;
       
-      while (retries <= maxRetries) {
-        try {
-          const { data, error: signUpError } = await supabase.auth.signUp({
-            email,
-            password,
-          });
-
-          if (signUpError) {
-            // If rate limited, retry with backoff
-            if (signUpError.status === 429) {
-              retries++;
-              console.log(`Rate limited during signup, retrying (${retries}/${maxRetries}) after ${backoff}ms`);
-              await new Promise(resolve => setTimeout(resolve, backoff));
-              backoff *= 2; // Exponential backoff
-              continue;
-            }
-            isRedirecting.current = false;
-            return { error: signUpError };
-          }
-
-          if (!data.user) {
-            isRedirecting.current = false;
-            return { error: new Error("No user data returned") };
-          }
-
-          // Create profile with retry
-          const createProfileFn = async () => {
-            return await supabase
-              .from("profiles")
-              .insert([
-                {
-                  id: data.user!.id,
-                  full_name: fullName,
-                  updated_at: new Date().toISOString(),
-                },
-              ]);
-          };
-
-          const { error: profileError } = await fetchWithRetry(createProfileFn);
-
-          if (profileError) {
-            isRedirecting.current = false;
-            return { error: profileError };
-          }
-
-          // If we got here, signup was successful
-          if (data.session) {
-            setCachedData(SESSION_CACHE_KEY, data.session);
-            
-            // Keep the redirect flag active for a bit to prevent auth events from
-            // processing during the transition
-            setTimeout(() => {
-              isRedirecting.current = false;
-            }, 2000);
-          } else {
-            isRedirecting.current = false;
-          }
-          
-          return { error: null };
-        } catch (err) {
-          retries++;
-          
-          // If max retries reached, return the error
-          if (retries > maxRetries) {
-            console.error("Max retries reached during signup", err);
-            isRedirecting.current = false;
-            return { error: err as Error };
-          }
-          
-          // Wait with exponential backoff before retrying
-          console.log(`Error during signup, retrying (${retries}/${maxRetries}) after ${backoff}ms`);
-          await new Promise(resolve => setTimeout(resolve, backoff));
-          backoff *= 2; // Exponential backoff
-        }
+      // Clear any existing tokens to prevent conflicts
+      try {
+        localStorage.removeItem('supabase.auth.token');
+        localStorage.removeItem('whistl-auth-token');
+        localStorage.removeItem('whistl-session');
+      } catch (e) {
+        console.error('Error clearing localStorage:', e);
       }
+      
+      console.log('Creating user account...');
+      
+      // Create the user with metadata that the database trigger can use
+      const { data, error: signUpError } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            // Add metadata that the database trigger can use
+            full_name: fullName,
+            is_admin: isAdmin
+          }
+        }
+      });
+      
+      if (signUpError) {
+        console.error('Error during signup:', signUpError);
+        isRedirecting.current = false;
+        return { error: signUpError };
+      }
+      
+      if (!data.user) {
+        console.error('No user data returned from signup');
+        isRedirecting.current = false;
+        return { error: new Error("No user data returned") };
+      }
+      
+      console.log('User created successfully with ID:', data.user.id);
+      
+      // DO NOT try to create a profile here - let the database trigger handle it
+      
+      // Only if admin access is requested, set a timeout to update it after 
+      // the profile has definitely been created by the trigger
+      if (isAdmin && data.user) {
+        // This won't block the signup completion
+        setTimeout(async () => {
+          try {
+            console.log('Attempting to update admin status after delay');
+            
+            // Double check if profile exists before attempting update
+            const { data: profile, error: getError } = await supabase
+              .from('profiles')
+              .select('id, is_admin')
+              .eq('id', data.user!.id)
+              .single();
+            
+            if (getError || !profile) {
+              console.error('Profile not found after waiting:', getError);
+              return;
+            }
+            
+            console.log('Profile found, updating admin status');
+            
+            // Only update if admin flag isn't already set
+            if (!profile.is_admin) {
+              const { error: updateError } = await supabase
+                .from('profiles')
+                .update({ is_admin: true })
+                .eq('id', data.user!.id);
+                
+              if (updateError) {
+                console.error('Failed to update admin status:', updateError);
+              } else {
+                console.log('Admin status updated successfully');
+              }
+            } else {
+              console.log('Admin status was already set correctly');
+            }
+          } catch (err) {
+            console.error('Error in delayed admin update:', err);
+          }
+        }, 5000); // Wait 5 seconds to be absolutely sure the profile exists
+      }
+      
+      // Store session if available
+      if (data.session) {
+        console.log('Storing session data');
+        setCachedData(SESSION_CACHE_KEY, data.session);
+      } else {
+        console.log('No session data available to store');
+      }
+      
+      console.log('Signup process completed successfully');
+      
+      // Reset redirection flag after signup
+      setTimeout(() => {
+        isRedirecting.current = false;
+      }, 1000);
+      
+      return { error: null };
     } catch (err) {
-      console.error("Unexpected error in signup flow", err);
+      console.error('Unexpected error in signup flow:', err);
       isRedirecting.current = false;
       return { error: err as Error };
     }
-    
-    // This should not be reached due to the returns inside the loop
-    isRedirecting.current = false;
-    return { error: new Error("Unexpected error during signup") };
-  }, [setCachedData, fetchWithRetry]);
+  }, [setCachedData]);
 
   const signOut = useCallback(async () => {
     // Prevent loops during sign-out
