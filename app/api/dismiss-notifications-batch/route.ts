@@ -32,7 +32,8 @@ export async function POST(request: Request) {
     const dismissalRecords = messageIds.map(messageId => ({
       message_id: messageId,
       user_id: userId,
-      dismissed_at: new Date().toISOString()
+      dismissed_at: new Date().toISOString(),
+      created_at: new Date().toISOString()
     }));
 
     // Insert the dismissal records using admin privileges

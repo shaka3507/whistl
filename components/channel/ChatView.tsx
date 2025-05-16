@@ -233,20 +233,6 @@ export default function ChatView({
                 onSubmit={handleSendNotification}
                 className="flex flex-col gap-2"
               >
-                <div className="flex items-center gap-4 mb-2">
-                  <div className="text-sm font-medium">Push Notification:</div>
-                  <div className="relative inline-flex h-4 w-8 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent bg-muted transition-colors duration-200 ease-in-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background">
-                    <span
-                      className={`pointer-events-none inline-block h-3 w-3 rounded-full bg-background shadow-lg transform ring-0 transition duration-200 ease-in-out ${
-                        notificationType === 'push' ? 'translate-x-4' : 'translate-x-0'
-                      }`}
-                      onClick={() => setNotificationType(notificationType === 'push' ? 'standard' : 'push')}
-                    />
-                  </div>
-                  <span className="text-sm text-muted-foreground">
-                    {notificationType === 'push' ? 'Push' : 'Standard'}
-                  </span>
-                </div>
                 <Textarea
                   placeholder="Type an important notification..."
                   value={notificationText}
@@ -259,7 +245,7 @@ export default function ChatView({
                   disabled={isSending || !notificationText.trim()}
                   className="h-10 w-fit ml-auto"
                 >
-                  Send {notificationType === 'push' ? 'Push' : 'Standard'} Notification
+                  Notify Channel
                   <Bell className="h-4 w-4 ml-2" />
                 </Button>
               </form>

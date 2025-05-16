@@ -376,6 +376,8 @@ export default function ChannelPage() {
           dismissals?.map((dismissal) => dismissal.message_id) || []
         );
 
+        console.log("Fetched dismissed message IDs:", Array.from(dismissedMessageIds));
+        
         // Set the dismissed notifications in state
         setDismissedNotifications(Array.from(dismissedMessageIds));
 
@@ -572,12 +574,15 @@ export default function ChannelPage() {
       // First, update the local state for immediate feedback
       setDismissedNotifications((prev) => [...prev, messageId]);
       
-      // Insert the dismissal in the database
-      const { error } = await supabase.from("message_dismissals").insert({
+      // Use upsert instead of insert to handle the case where the notification is already dismissed
+      const { error } = await supabase.from("message_dismissals").upsert({
         message_id: messageId,
         user_id: user.id,
         dismissed_at: new Date().toISOString(),
         created_at: new Date().toISOString()
+      }, {
+        onConflict: 'message_id,user_id',
+        ignoreDuplicates: true
       });
 
       if (error) {
@@ -613,12 +618,15 @@ export default function ChannelPage() {
       // Also update the dismissedNotifications state
       setDismissedNotifications((prev) => [...prev, messageId]);
       
-      // Insert the acknowledgment in the message_dismissals table
-      const { error } = await supabase.from("message_dismissals").insert({
+      // Use upsert instead of insert to handle the case where the message is already acknowledged
+      const { error } = await supabase.from("message_dismissals").upsert({
         message_id: messageId,
         user_id: user.id,
         dismissed_at: new Date().toISOString(),
         created_at: new Date().toISOString()
+      }, {
+        onConflict: 'message_id,user_id',
+        ignoreDuplicates: true
       });
 
       if (error) {
@@ -1102,12 +1110,15 @@ export default function ChannelPage() {
       console.log("Dismissing admin notification:", notificationId);
       console.log("Updated local dismissedNotifications:", [...dismissedNotifications, notificationId]);
       
-      // Insert the dismissal in the database
-      const { error } = await supabase.from("message_dismissals").insert({
+      // Use upsert instead of insert to handle the case where the notification is already dismissed
+      const { error } = await supabase.from("message_dismissals").upsert({
         message_id: notificationId,
         user_id: user.id,
         dismissed_at: new Date().toISOString(),
         created_at: new Date().toISOString()
+      }, {
+        onConflict: 'message_id,user_id',
+        ignoreDuplicates: true
       });
 
       if (error) {
@@ -1209,6 +1220,7 @@ export default function ChannelPage() {
                 acknowledgeAlert={acknowledgeAlert}
                 dismissAlert={dismissAlert}
                 dismissAdminNotification={dismissAdminNotification}
+                dismissedNotifications={dismissedNotifications}
               />
             )}
             <div className="flex-1 overflow-hidden flex flex-col">

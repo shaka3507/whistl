@@ -51,6 +51,7 @@ interface ChannelHeaderProps {
   acknowledgeAlert: () => Promise<void>;
   dismissAlert: (alertId: string) => Promise<void>;
   dismissAdminNotification: (notificationId: string) => Promise<void>;
+  dismissedNotifications?: string[];
 }
 
 export default function ChannelHeader({
@@ -70,19 +71,20 @@ export default function ChannelHeader({
   showAcknowledgePrompt,
   acknowledgeAlert,
   dismissAlert,
-  dismissAdminNotification
+  dismissAdminNotification,
+  dismissedNotifications = []
 }: ChannelHeaderProps) {
   const [membersDialogOpen, setMembersDialogOpen] = useState(false);
   const [adminNotifications, setAdminNotifications] = useState<any[]>([]);
   const [loadingNotifications, setLoadingNotifications] = useState(false);
-  const [dismissedNotificationIds, setDismissedNotificationIds] = useState<Set<string>>(new Set());
+  const [localDismissedIds, setLocalDismissedIds] = useState<Set<string>>(new Set());
   
   // Fetch admin notifications
   useEffect(() => {
     const fetchAdminNotifications = async () => {
       setLoadingNotifications(true);
       try {
-        // Get only the 2 most recent admin notifications for this channel
+        // Get admin notifications for this channel that haven't been dismissed
         const { data, error } = await supabase
           .from("messages")
           .select(`
@@ -97,13 +99,24 @@ export default function ChannelHeader({
           `)
           .eq("channel_id", channel.id)
           .eq("is_notification", true)
-          .order("created_at", { ascending: false })
-          .limit(2);
+          .order("created_at", { ascending: false });
           
         if (error) {
           console.error("Error fetching admin notifications:", error);
-        } else {
-          setAdminNotifications(data || []);
+          return;
+        }
+        
+        if (data) {
+          console.log("Fetched admin notifications:", data.length);
+          console.log("Current dismissed notifications:", dismissedNotifications);
+          
+          // Filter out notifications that are already dismissed
+          const filteredNotifications = data.filter(
+            notification => !dismissedNotifications.includes(notification.id)
+          );
+          
+          console.log("Filtered notifications after removing dismissed:", filteredNotifications.length);
+          setAdminNotifications(filteredNotifications);
         }
       } catch (err) {
         console.error("Error in fetching admin notifications:", err);
@@ -112,8 +125,10 @@ export default function ChannelHeader({
       }
     };
     
-    fetchAdminNotifications();
-  }, [channel.id]);
+    if (channel && channel.id) {
+      fetchAdminNotifications();
+    }
+  }, [channel.id, dismissedNotifications]); // Add dismissedNotifications as a dependency
   
   // Add a safety mechanism to ensure invite button doesn't get stuck in sending state
   useEffect(() => {
@@ -135,14 +150,16 @@ export default function ChannelHeader({
   
   // Handle notification dismissal
   const handleDismissNotification = (notificationId: string) => {
-    setDismissedNotificationIds(prev => new Set([...prev, notificationId]));
+    setLocalDismissedIds(prev => new Set([...prev, notificationId]));
     // Call the parent function to persist to database
     dismissAdminNotification(notificationId);
   };
   
-  // Filter out dismissed notifications
+  // Filter out dismissed notifications - use both local state and parent prop
   const visibleNotifications = adminNotifications.filter(
-    notification => !dismissedNotificationIds.has(notification.id)
+    notification => 
+      !localDismissedIds.has(notification.id) && 
+      !dismissedNotifications.includes(notification.id)
   );
 
   return (

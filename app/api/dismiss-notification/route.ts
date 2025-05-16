@@ -34,7 +34,8 @@ export async function POST(request: Request) {
       .insert({
         message_id: messageId,
         user_id: userId,
-        dismissed_at: new Date().toISOString()
+        dismissed_at: new Date().toISOString(),
+        created_at: new Date().toISOString()
       });
 
     if (error) {
