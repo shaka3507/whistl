@@ -55,6 +55,7 @@ interface SuppliesViewProps {
   setNewItemDescription: (value: string) => void;
   handleRequestItem: (e: React.FormEvent) => Promise<void>;
   isSending: boolean;
+  isAdmin?: boolean;
 }
 
 export default function SuppliesView({
@@ -75,7 +76,8 @@ export default function SuppliesView({
   newItemDescription,
   setNewItemDescription,
   handleRequestItem,
-  isSending
+  isSending,
+  isAdmin = false
 }: SuppliesViewProps) {
   
   // Helper function to get remaining quantity
@@ -232,6 +234,8 @@ export default function SuppliesView({
             const remainingQuantity = getRemainingQuantity(item);
             const hasJustClaimed = justClaimedItems.has(item.id);
             const userHasClaimed = userClaimedItems.has(item.id);
+            const isBeingClaimed = claimingItemIds.has(item.id);
+            const isUnavailable = remainingQuantity <= 0;
             
             return (
               <div key={item.id} className="grid grid-cols-2 gap-2 p-3 items-center bg-card">
@@ -252,24 +256,33 @@ export default function SuppliesView({
                   {remainingQuantity > 0 ? (
                     <Button
                       onClick={() => claimSupplyItem(item.id)}
-                      disabled={remainingQuantity <= 0 || hasJustClaimed || userHasClaimed || claimingItemIds.has(item.id)}
+                      disabled={isUnavailable || hasJustClaimed || userHasClaimed || isBeingClaimed}
                       size="sm"
-                      className={`rounded-full px-4 ${(hasJustClaimed || userHasClaimed) ? 'bg-green-700' : 'bg-green-500'}`}
+                      className={`rounded-full px-4 ${
+                        isBeingClaimed 
+                          ? 'bg-blue-500 cursor-not-allowed' 
+                          : (hasJustClaimed || userHasClaimed) 
+                            ? 'bg-green-700' 
+                            : 'bg-green-500'
+                      }`}
                     >
-                      {claimingItemIds.has(item.id) ? (
+                      {isBeingClaimed ? (
                         <>
                           <span className="animate-spin mr-2 h-4 w-4 border-b-2 border-white rounded-full inline-block"></span>
                           Claiming...
                         </>
-                      ) : (hasJustClaimed || userHasClaimed) ? (
-                        'Claimed'
+                      ) : hasJustClaimed || userHasClaimed ? (
+                        <>
+                          <span className="mr-1">✓</span>
+                          Claimed
+                        </>
                       ) : (
                         'Claim'
                       )}
                     </Button>
                   ) : (
                     <span className="text-muted-foreground text-sm bg-muted px-3 py-1 rounded-full inline-block">
-                      not available
+                      Not available
                     </span>
                   )}
                 </div>

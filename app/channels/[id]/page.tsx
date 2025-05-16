@@ -703,64 +703,111 @@ export default function ChannelPage() {
   const claimSupplyItem = async (itemId: string) => {
     if (!user || !channel || !alert) return;
     
+    // Early check - if this item is already being claimed or is not available, prevent action
+    const item = supplyItems.find(i => i.id === itemId);
+    if (!item) {
+      toast({
+        title: "Error",
+        description: "Item not found",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    // Check remaining quantity before proceeding
+    const remainingQuantity = item.quantity - (claimedItems[itemId] || 0);
+    if (remainingQuantity <= 0) {
+      toast({
+        title: "Item unavailable",
+        description: "This item is no longer available",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    // Check if this item is currently in claiming state
+    if (claimingItemIds.has(itemId)) {
+      return; // Already processing this claim
+    }
+    
     try {
+      // Set claiming state to prevent multiple clicks
       setClaimingItemIds(prev => new Set([...prev, itemId]));
       
-      // First, check if this item is already claimed
-      const { data: existingClaim, error: checkError } = await supabase
-        .from("claimed_supply_items")
-        .select("*")
-        .eq("item_id", itemId)
-        .single();
-      
-      if (checkError && checkError.code !== 'PGRST116') { // PGRST116 is "not found"
-        throw checkError;
-      }
-      
-      if (existingClaim) {
-        // Item already claimed - could be by this user or another user
-        if (existingClaim.user_id === user.id) {
-          toast({
-            title: "Already claimed",
-            description: "You've already claimed this item",
-            variant: "destructive"
-          });
-        } else {
-          toast({
-            title: "Item unavailable",
-            description: "This item has already been claimed by someone else",
-            variant: "destructive"
-          });
-        }
-        return;
-      }
-      
-      // Find the item to get its quantity
-      const item = supplyItems.find(i => i.id === itemId);
-      if (!item) {
-        throw new Error("Item not found");
-      }
-      
-      // Use RLS policies to ensure only one user can claim successfully
-      const { error } = await supabase.from("claimed_supply_items").insert({
-        item_id: itemId,
-        user_id: user.id,
-        alert_id: alert.id,
-        claimed_quantity: 1, // Default to 1, or use a dynamic quantity if your UI allows it
-        claimed_at: new Date().toISOString()
+      // Use the API endpoint to claim the item
+      const response = await fetch('/api/claim-item', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          itemId,
+          userId: user.id,
+          claimedQuantity: 1,
+          alertId: alert.id,
+        }),
+      }).catch(err => {
+        console.error("Network error claiming item:", err);
+        throw new Error("Network error. Please check your connection and try again.");
       });
-
-      if (error) {
-        if (error.code === '23505') { // Unique constraint violation - user already claimed or race condition
-          toast({
-            title: "Already claimed",
-            description: "This item has just been claimed",
-            variant: "destructive"
-          });
+      
+      if (!response) {
+        throw new Error("Failed to get a response from the server");
+      }
+      
+      let result;
+      try {
+        result = await response.json();
+      } catch (err) {
+        console.error("Error parsing response:", err);
+        throw new Error("Invalid response from server");
+      }
+      
+      if (!response.ok) {
+        // Handle different error scenarios
+        if (response.status === 409) {
+          // Conflict - item already claimed or race condition
+          console.log("409 Conflict response:", result);
+          if (result.code === 'ALREADY_CLAIMED') {
+            // Check if claimed by current user
+            if (result.existingClaim?.user_id === user.id) {
+              toast({
+                title: "Already claimed",
+                description: "You've already claimed this item",
+                variant: "destructive"
+              });
+            } else {
+              toast({
+                title: "Item unavailable",
+                description: "This item has already been claimed by someone else",
+                variant: "destructive"
+              });
+            }
+          } else if (result.code === 'RACE_CONDITION') {
+            toast({
+              title: "Item unavailable",
+              description: "Someone else just claimed this item",
+              variant: "destructive"
+            });
+          } else if (result.code === 'INSUFFICIENT_QUANTITY') {
+            toast({
+              title: "Not enough available",
+              description: "There's not enough quantity available for this item",
+              variant: "destructive"
+            });
+          } else {
+            toast({
+              title: "Error",
+              description: result.error || "Failed to claim item",
+              variant: "destructive"
+            });
+          }
         } else {
-          throw error;
+          // Other error
+          throw new Error(result.error || "Failed to claim item");
         }
       } else {
+        // Success
         // Update local state to reflect the claim
         setJustClaimedItems(prev => new Set([...prev, itemId]));
         setUserClaimedItems(prev => new Set([...prev, itemId]));
@@ -769,22 +816,6 @@ export default function ChannelPage() {
           title: "Item claimed",
           description: "You've claimed this item"
         });
-        
-        // Refresh data to ensure UI is in sync with the database
-        fetchMessages();
-        
-        // Re-fetch supply items
-        if (alert) {
-          const { data: supplyItemsData, error: supplyItemsError } = await supabase
-            .from("alert_preparation_items")
-            .select("*")
-            .eq("alert_id", alert.id)
-            .order("name");
-            
-          if (!supplyItemsError && supplyItemsData) {
-            setSupplyItems(supplyItemsData);
-          }
-        }
       }
     } catch (err: any) {
       console.error("Error claiming item:", err);
@@ -963,6 +994,7 @@ export default function ChannelPage() {
         return (
           <SuppliesView 
             supplyItems={supplyItems}
+            claimedItems={claimedItems}
             claimingItemIds={claimingItemIds}
             justClaimedItems={justClaimedItems}
             userClaimedItems={userClaimedItems}
@@ -970,6 +1002,7 @@ export default function ChannelPage() {
             setShowUserItems={setShowUserItems}
             claimSupplyItem={claimSupplyItem}
             requestedItems={requestedItems}
+            user={user}
             showRequestItemModal={showRequestItemModal}
             setShowRequestItemModal={setShowRequestItemModal}
             newItemTitle={newItemTitle}
@@ -1138,6 +1171,67 @@ export default function ChannelPage() {
       setDismissedNotifications(prev => prev.filter(id => id !== notificationId));
     }
   };
+
+  // Add subscription to claimed items for real-time updates
+  useEffect(() => {
+    if (!alert || !user) return;
+    
+    // Subscribe to claimed_supply_items table for real-time updates
+    const claimedItemsSubscription = supabase
+      .channel('claimed-items-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*', // Listen for all events (insert, update, delete)
+          schema: 'public',
+          table: 'claimed_supply_items',
+          filter: `alert_id=eq.${alert.id}`,
+        },
+        async (payload) => {
+          console.log('Claimed items changed:', payload);
+          
+          // Fetch the latest claimed items data
+          const { data, error } = await supabase
+            .from("claimed_supply_items")
+            .select("*")
+            .eq("alert_id", alert.id);
+          
+          if (error) {
+            console.error("Error fetching updated claimed items:", error);
+            return;
+          }
+          
+          // Update local state
+          if (data) {
+            // Create a map to count claimed quantities for each item
+            const claimedItemsMap: Record<string, number> = {};
+            
+            // Track which items this user has claimed
+            const userClaimed = new Set<string>();
+            
+            data.forEach(claim => {
+              // Count total claimed quantities
+              const itemId = claim.item_id;
+              claimedItemsMap[itemId] = (claimedItemsMap[itemId] || 0) + claim.claimed_quantity;
+              
+              // Mark items claimed by the current user
+              if (claim.user_id === user.id) {
+                userClaimed.add(itemId);
+              }
+            });
+            
+            setClaimedItems(claimedItemsMap);
+            setUserClaimedItems(userClaimed);
+          }
+        }
+      )
+      .subscribe();
+    
+    // Cleanup subscription on unmount
+    return () => {
+      claimedItemsSubscription.unsubscribe();
+    };
+  }, [alert, user]);
 
   if (isLoading) {
     return (
