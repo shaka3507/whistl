@@ -405,6 +405,39 @@ export default function ChannelPage() {
     }
   };
 
+  // Add real-time subscription for messages
+  useEffect(() => {
+    if (!id || !user) return;
+    
+    console.log("Setting up real-time subscription for messages");
+    
+    // Subscribe to messages table for real-time updates
+    const messagesSubscription = supabase
+      .channel('messages-channel')
+      .on(
+        'postgres_changes',
+        {
+          event: '*', // Listen for all events (insert, update, delete)
+          schema: 'public',
+          table: 'messages',
+          filter: `channel_id=eq.${id}`,
+        },
+        async (payload) => {
+          console.log('Message change detected:', payload);
+          
+          // Refresh messages when changes occur
+          await fetchMessages();
+        }
+      )
+      .subscribe();
+    
+    // Cleanup subscription on unmount
+    return () => {
+      console.log("Cleaning up messages subscription");
+      messagesSubscription.unsubscribe();
+    };
+  }, [id, user]);
+
   // Function to send a message
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -424,7 +457,6 @@ export default function ChannelPage() {
       }
 
       setNewMessage("");
-      await fetchMessages();
     } catch (err: any) {
       console.error("Error sending message:", err);
       setError(err.message || "Failed to send message");

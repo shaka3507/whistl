@@ -4,11 +4,8 @@ import { createClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
 import type { Database } from '@/lib/supabase-types';
 import crypto from 'crypto';
-import axios from 'axios';
 
 // Get these from environment variables
-const MAILGUN_API_KEY = process.env.MAILGUN_API_KEY;
-const MAILGUN_DOMAIN = process.env.MAILGUN_DOMAIN;
 const APP_URL = process.env.NODE_ENV === 'production' 
   ? 'https://whistl.vercel.app'
   : process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
@@ -36,9 +33,8 @@ export async function POST(request: Request) {
     console.log('- Email:', email);
     console.log('- Channel ID:', channelId);
     
-    // Create a regular client for auth context
-    const cookieStore = cookies();
-    const supabase = createRouteHandlerClient<Database>({ cookies: () => cookieStore });
+    // Create a regular client for auth context - Fix for cookies() usage
+    const supabase = createRouteHandlerClient<Database>({ cookies });
     
     // Get the authenticated user ID
     const { data: sessionData } = await supabase.auth.getSession();
@@ -98,7 +94,32 @@ export async function POST(request: Request) {
       );
     }
     
-    // Check if the user already exists in the system
+    // First check if user exists in auth system
+    let authUser = null;
+    if (adminSupabase) {
+      try {
+        // Using the admin API to find user by email
+        const { data: users, error } = await adminSupabase.auth.admin.listUsers();
+        if (!error && users) {
+          const userWithEmail = users.users.find(user => 
+            user.email?.toLowerCase() === normalizedEmail
+          );
+          if (userWithEmail) {
+            authUser = { user: userWithEmail };
+            console.log(`Found user in auth system with ID: ${userWithEmail.id}`);
+          } else {
+            console.log(`No user found in auth system with email: ${normalizedEmail}`);
+          }
+        }
+      } catch (error) {
+        console.error('Error checking auth user:', error);
+        // Continue with the flow
+      }
+    } else {
+      console.log('Admin Supabase client not available, skipping auth user check');
+    }
+    
+    // Check if the user has a profile
     const { data: existingUser, error: userError } = await dbClient
       .from('profiles')
       .select('id, email, full_name')
@@ -109,16 +130,41 @@ export async function POST(request: Request) {
       throw userError;
     }
     
-    // If user exists, add them to the channel
     if (existingUser) {
-      console.log(`User exists with id ${existingUser.id}, adding them to channel ${channelId}`);
+      console.log(`Found user profile with ID: ${existingUser.id}`);
+    } else {
+      console.log(`No user profile found for email: ${normalizedEmail}`);
+    }
+    
+    // If user exists either in auth or has a profile, add them to the channel
+    if (existingUser || authUser?.user) {
+      const userId = existingUser?.id || authUser?.user.id;
+      console.log(`User exists with id ${userId}, adding them to channel ${channelId}`);
+      
+      // If the user exists in auth but doesn't have a profile, create one
+      if (authUser?.user && !existingUser) {
+        console.log(`Creating profile for user ${userId} with email ${normalizedEmail}`);
+        const { error: profileError } = await dbClient
+          .from('profiles')
+          .insert({
+            id: userId,
+            email: normalizedEmail,
+            full_name: authUser.user.user_metadata?.full_name || normalizedEmail.split('@')[0],
+            avatar_url: authUser.user.user_metadata?.avatar_url || null
+          });
+          
+        if (profileError) {
+          console.error('Error creating profile:', profileError);
+          // Continue with the flow as we can still add them to the channel
+        }
+      }
       
       // Check if user is already a member
       const { data: existingMember, error: memberCheckError } = await dbClient
         .from("channel_members")
         .select("id")
         .eq("channel_id", channelId)
-        .eq("user_id", existingUser.id)
+        .eq("user_id", userId)
         .maybeSingle();
         
       if (memberCheckError && memberCheckError.code !== 'PGRST116') {
@@ -137,7 +183,7 @@ export async function POST(request: Request) {
         .from("channel_members")
         .insert({
           channel_id: channelId,
-          user_id: existingUser.id,
+          user_id: userId,
           role: "member"
         });
         
@@ -151,29 +197,15 @@ export async function POST(request: Request) {
         .insert({
           channel_id: channelId,
           user_id: requestUserId,
-          content: `${existingUser.full_name || normalizedEmail} has been added to the channel`,
+          content: `${existingUser?.full_name || normalizedEmail} has been added to the channel`,
           is_notification: true
         });
         
-      // Send email notification that they were added to the channel
-      if (MAILGUN_API_KEY && MAILGUN_DOMAIN) {
-        try {
-          await sendEmail(
-            normalizedEmail,
-            'You have been added to a channel',
-            `You have been added to the channel "${channel.name}" in Whistl. Click here to view: ${APP_URL}/channels/${channelId}`
-          );
-        } catch (emailError) {
-          console.error('Error sending email notification:', emailError);
-          // Continue even if email fails
-        }
-      }
-        
       return NextResponse.json(
         { 
-          message: `${existingUser.full_name || normalizedEmail} has been added to the channel`,
+          message: `${existingUser?.full_name || normalizedEmail} has been added to the channel`,
           userAdded: true,
-          addedUserId: existingUser.id
+          addedUserId: userId
         },
         { status: 200 }
       );
@@ -230,24 +262,8 @@ export async function POST(request: Request) {
       // Construct the invitation URL
       const invitationUrl = `${APP_URL}/invite?token=${invitationToken}`;
       
-      // Send the invitation email
-      if (MAILGUN_API_KEY && MAILGUN_DOMAIN) {
-        try {
-          await sendEmail(
-            normalizedEmail,
-            'You have been invited to join a channel',
-            `You have been invited to join the channel "${channel.name}" in Whistl. Click here to accept the invitation: ${invitationUrl}`
-          );
-        } catch (emailError) {
-          console.error('Error sending invitation email:', emailError);
-          return NextResponse.json(
-            { error: 'Failed to send invitation email', details: emailError },
-            { status: 500 }
-          );
-        }
-      } else {
-        console.log(`[DEVELOPMENT] Invitation URL: ${invitationUrl}`);
-      }
+      // Log the invitation URL for development (no email sending)
+      console.log(`[DEVELOPMENT] Invitation URL: ${invitationUrl}`);
       
       return NextResponse.json(
         { 
@@ -265,31 +281,3 @@ export async function POST(request: Request) {
     );
   }
 }
-
-async function sendEmail(to: string, subject: string, text: string) {
-  if (!MAILGUN_API_KEY || !MAILGUN_DOMAIN) {
-    console.warn('Mailgun API key or domain not configured');
-    return;
-  }
-
-  const url = `https://api.mailgun.net/v3/${MAILGUN_DOMAIN}/messages`;
-  const auth = `Basic ${Buffer.from(`api:${MAILGUN_API_KEY}`).toString('base64')}`;
-
-  const response = await axios.post(
-    url,
-    new URLSearchParams({
-      from: `Whistl <mailgun@${MAILGUN_DOMAIN}>`,
-      to,
-      subject,
-      text,
-    }),
-    {
-      headers: {
-        Authorization: auth,
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-    }
-  );
-
-  return response.data;
-} 
